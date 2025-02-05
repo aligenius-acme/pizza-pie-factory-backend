@@ -10,11 +10,10 @@ const CustomerSchema = new Schema(
   {
     firstName: { type: String },
     lastName: { type: String },
-    email: { type: String, unique: true, match: /.+\@.+\..+/ },
+    email: { type: String, unique: true },
     phone: {
       type: String,
       unique: true,
-      match: /^((\+971\s?|00971\s?|0)5[024568]\d{7})$/, // Dubai phone number validation
     },
     passwordHash: { type: String },
     authProvider: {
@@ -40,17 +39,17 @@ const CustomerSchema = new Schema(
         },
         cardNumber: {
           type: String,
-          match: /^\d{16}$/,
         },
         expiryDate: {
           type: String,
-          match: /^(0[1-9]|1[0-2])\/(\d{2})$/,
         },
         saveForFuture: { type: Boolean, default: false },
       },
     ],
     loyaltyPoints: { type: Number, default: 0, min: 0 },
     orderHistory: [{ type: Schema.Types.ObjectId, ref: "Order" }],
+    resetPasswordToken: { type: String },
+    resetPasswordExpiry: { type: Date },
   },
   { timestamps: true }
 );

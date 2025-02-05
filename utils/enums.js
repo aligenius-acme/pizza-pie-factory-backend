@@ -1,7 +1,8 @@
 // enums.js
 const AuthProviders = Object.freeze({
   GOOGLE: "Google",
-  MICROSOFT: "Microsoft",
+  APPLE: "Apple",
+  FACEBOOK: "Facebook",
   LOCAL: "Local",
 });
 
