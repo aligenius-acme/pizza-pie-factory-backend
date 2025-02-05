@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const NotificationSchema = new mongoose.Schema(
+const NotificationSchema = Schema(
   {
-    notificationId: { type: mongoose.Schema.Types.ObjectId, auto: true },
-    recipientId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    recipientId: { type: Schema.Types.ObjectId, required: true },
     recipientType: {
       type: String,
       required: true,
@@ -15,13 +15,11 @@ const NotificationSchema = new mongoose.Schema(
       required: true,
       enum: ["NewOrder", "OrderUpdate", "Promotion"],
     },
-    relatedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
-    branchId: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" },
+    relatedOrderId: { type: Schema.Types.ObjectId, ref: "Order" },
+    branchId: { type: Schema.Types.ObjectId, ref: "Branch" },
     read: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-module.exports = {
-  Notification: mongoose.model("Notification", NotificationSchema),
-};
+module.exports = mongoose.model("Notification", NotificationSchema);

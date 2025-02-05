@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
-const EmployeeSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const EmployeeSchema = new Schema(
   {
-    employeeId: { type: mongoose.Schema.Types.ObjectId, auto: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true, match: /.+\@.+\..+/ },
@@ -18,7 +19,7 @@ const EmployeeSchema = new mongoose.Schema(
       enum: ["Kitchen Staff, ", "Delivery Driver", "Customer Support"],
     },
     branchId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Branch",
       required: true,
     },
@@ -26,6 +27,4 @@ const EmployeeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = {
-  Employee: mongoose.model("Employee", EmployeeSchema),
-};
+module.exports = mongoose.model("Employee", EmployeeSchema);

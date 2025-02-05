@@ -1,10 +1,16 @@
 const mongoose = require("mongoose");
-const CustomerSchema = new mongoose.Schema(
+const {
+  AuthProviders,
+  PaymentTypes,
+  AddressLabels,
+} = require("../utils/enums");
+const { Schema } = mongoose;
+
+const CustomerSchema = new Schema(
   {
-    customerId: { type: mongoose.Schema.Types.ObjectId, auto: true },
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, required: true, unique: true, match: /.+\@.+\..+/ },
+    firstName: { type: String },
+    lastName: { type: String },
+    email: { type: String, unique: true, match: /.+\@.+\..+/ },
     phone: {
       type: String,
       unique: true,
@@ -13,13 +19,13 @@ const CustomerSchema = new mongoose.Schema(
     passwordHash: { type: String },
     authProvider: {
       type: String,
-      enum: ["Google", "Microsoft", "Local"],
+      enum: Object.values(AuthProviders),
       required: true,
     },
     authProviderId: { type: String, unique: true, sparse: true },
     deliveryAddresses: [
       {
-        label: { type: String, enum: ["Home", "Office"] },
+        label: { type: String, enum: Object.values(AddressLabels) },
         address: { type: String },
         latitude: { type: Number },
         longitude: { type: Number },
@@ -28,36 +34,25 @@ const CustomerSchema = new mongoose.Schema(
     ],
     paymentMethods: [
       {
-        paymentType: { type: String, enum: ["CreditCard", "COD"] },
+        paymentType: { type: String, enum: Object.values(PaymentTypes) },
         cardType: {
           type: String,
-          required: function () {
-            return this.paymentType && this.paymentType === "CreditCard";
-          },
         },
         cardNumber: {
           type: String,
-          required: function () {
-            return this.paymentType && this.paymentType === "CreditCard";
-          },
           match: /^\d{16}$/,
         },
         expiryDate: {
           type: String,
-          required: function () {
-            return this.paymentType && this.paymentType === "CreditCard";
-          },
           match: /^(0[1-9]|1[0-2])\/(\d{2})$/,
         },
         saveForFuture: { type: Boolean, default: false },
       },
     ],
     loyaltyPoints: { type: Number, default: 0, min: 0 },
-    orderHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
+    orderHistory: [{ type: Schema.Types.ObjectId, ref: "Order" }],
   },
   { timestamps: true }
 );
 
-module.exports = {
-  Customer: mongoose.model("Customer", CustomerSchema),
-};
+module.exports = mongoose.model("Customer", CustomerSchema);

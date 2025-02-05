@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const BranchSchema = new mongoose.Schema(
+const BranchSchema = new Schema(
   {
-    branchId: { type: mongoose.Schema.Types.ObjectId, auto: true },
     name: { type: String, required: true },
     location: {
       address: { type: String, required: true },
@@ -14,11 +14,9 @@ const BranchSchema = new mongoose.Schema(
       required: true,
       match: /^\+?[1-9]\d{1,14}$/,
     },
-    employees: [{ type: mongoose.Schema.Types.ObjectId, ref: "Employee" }],
+    employees: [{ type: Schema.Types.ObjectId, ref: "Employee" }],
   },
   { timestamps: true }
 );
 
-module.exports = {
-  Branch: mongoose.model("Branch", BranchSchema),
-};
+module.exports = mongoose.model("Branch", BranchSchema);

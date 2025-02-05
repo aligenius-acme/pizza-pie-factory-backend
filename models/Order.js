@@ -1,22 +1,22 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const OrderSchema = new mongoose.Schema(
+const OrderSchema = new Schema(
   {
-    orderId: { type: mongoose.Schema.Types.ObjectId, auto: true },
     customerId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Customer",
       required: true,
     },
     branchId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Branch",
       required: true,
     },
     items: [
       {
         foodItemId: {
-          type: mongoose.Schema.Types.ObjectId,
+          type: Schema.Types.ObjectId,
           ref: "FoodItem",
           required: true,
         },
@@ -70,6 +70,4 @@ const OrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = {
-  Order: mongoose.model("Order", OrderSchema),
-};
+module.exports = mongoose.model("Order", OrderSchema);

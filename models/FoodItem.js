@@ -1,11 +1,11 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const FoodItemSchema = new mongoose.Schema(
+const FoodItemSchema = new Schema(
   {
-    foodItemId: { type: mongoose.Schema.Types.ObjectId, auto: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },
-    categories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
+    categories: [{ type: Schema.Types.ObjectId, ref: "Category" }],
     ingredients: [{ type: String }],
     nutritionalInfo: {
       calories: { type: Number },
@@ -17,11 +17,9 @@ const FoodItemSchema = new mongoose.Schema(
       spiceLevels: [{ type: String }],
       dietaryOptions: [{ type: String }],
     },
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
+    orders: [{ type: Schema.Types.ObjectId, ref: "Order" }],
   },
   { timestamps: true }
 );
 
-module.exports = {
-  FoodItem: mongoose.model("FoodItem", FoodItemSchema),
-};
+module.exports = mongoose.model("FoodItem", FoodItemSchema);

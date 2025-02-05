@@ -1,14 +1,15 @@
 const mongoose = require("mongoose");
-const EmployeeMessageSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const EmployeeMessageSchema = new Schema(
   {
-    employeeMessageId: { type: mongoose.Schema.Types.ObjectId, auto: true },
     senderId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Employee",
       required: true,
     },
     receiverId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Employee",
       required: true,
     },
@@ -18,6 +19,4 @@ const EmployeeMessageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = {
-  EmployeeMessage: mongoose.model("EmployeeMessage", EmployeeMessageSchema),
-};
+module.exports = mongoose.model("EmployeeMessage", EmployeeMessageSchema);
