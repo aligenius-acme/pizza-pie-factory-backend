@@ -1,13 +1,18 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const passport = require("passport");
 const crypto = require("crypto");
+
+/* TO BE USED IF OAUTH IS REQUIRED
+const passport = require("passport");
 const { Strategy: GoogleStrategy } = require("passport-google-oauth20");
 const { Strategy: AppleStrategy } = require("passport-apple");
 const { Strategy: FacebookStrategy } = require("passport-facebook");
-const { body, validationResult } = require("express-validator");
+*/
+
+const { param, body, validationResult } = require("express-validator");
 const Customer = require("../models/Customer");
+const authMiddleware = require("../middleware/auth");
 const { AuthProviders } = require("../utils/enums");
 const { sendEmail } = require("../utils/email");
 const {
@@ -15,6 +20,7 @@ const {
   emailValidation,
   phoneValidation,
   nameValidation,
+  addressValidation,
 } = require("../utils/validation");
 require("dotenv").config();
 
@@ -22,11 +28,11 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRY = process.env.JWT_EXPIRY;
 const FRONTEND_URL = process.env.FRONTEND_URL;
+const PASSWORD_RESET_TOKEN_EXPIRY = process.env.PASSWORD_RESET_TOKEN_EXPIRY;
 
-//#region --CUSTOMER--
-
-//#region CUSTOMER REGISTRATION
-// Register customer with Username & Password
+// @route   POST /customer/register
+// @desc    Register a new customer using user name and password
+// @access  PUBLIC
 router.post(
   "/customer/register",
   [
@@ -42,24 +48,64 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { firstName, lastName, email, phone, password } = req.body;
-      let customer = await Customer.findOne({ email });
-      if (customer)
-        return res.status(400).json({ message: "User already exists" });
-
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(password, salt);
-
-      customer = new Customer({
+      const {
         firstName,
         lastName,
         email,
         phone,
-        passwordHash,
-        authProvider: AuthProviders.LOCAL,
-      });
+        password,
+        deliveryAddresses,
+        paymentMethods,
+        isGuest,
+      } = req.body;
+
+      let customer = await Customer.findOne({ email });
+
+      if (customer) {
+        if (customer.isGuest && isGuest) {
+          customer.firstName = firstName;
+          customer.lastName = lastName;
+          customer.phone = phone;
+          customer.deliveryAddresses = deliveryAddresses;
+          customer.paymentMethods = paymentMethods;
+          await customer.save();
+
+          const token = jwt.sign({ id: customer._id }, JWT_SECRET, {
+            expiresIn: JWT_EXPIRY,
+          });
+          return res.json({ token });
+        }
+        return res.status(400).json({ message: "User already exists" });
+      }
+      if (isGuest) {
+        customer = new Customer({
+          firstName,
+          lastName,
+          email,
+          phone,
+          deliveryAddresses,
+          paymentMethods,
+          isGuest: true,
+        });
+      } else {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        customer = new Customer({
+          firstName,
+          lastName,
+          email,
+          phone,
+          passwordHash,
+          authProvider: AuthProviders.LOCAL,
+          deliveryAddresses,
+          paymentMethods,
+          isGuest: false,
+        });
+      }
+
       await customer.save();
 
+      // Generate token
       const token = jwt.sign({ id: customer._id }, JWT_SECRET, {
         expiresIn: JWT_EXPIRY,
       });
@@ -69,10 +115,76 @@ router.post(
     }
   }
 );
-//#endregion
 
-//#region CUSTOMER LOGIN
-// Login customer with Username & Password
+// @route   PUT /customer/update/:id
+// @desc    Update customer details, including delivery addresses
+// @access  PRIVATE
+router.put(
+  "/customer/update/:id",
+  authMiddleware.authenticateJWT,
+  [
+    param("id").isMongoId().withMessage("Invalid customer Id"),
+    ...nameValidation(),
+    ...emailValidation(),
+    ...phoneValidation(),
+    ...addressValidation(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { id } = req.params;
+
+      if (req.user.id !== id) {
+        return res
+          .status(403)
+          .json({ message: "Unauthorized to update this profile" });
+      }
+
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        deliveryAddresses,
+        paymentMethods,
+        loyaltyPoints,
+      } = req.body;
+
+      let customer = await Customer.findById(id);
+      if (!customer)
+        return res.status(404).json({ message: "Customer not found" });
+
+      if (firstName) customer.firstName = firstName;
+      if (lastName) customer.lastName = lastName;
+      if (email) customer.email = email;
+      if (phone) customer.phone = phone;
+
+      if (deliveryAddresses && Array.isArray(deliveryAddresses)) {
+        customer.deliveryAddresses = deliveryAddresses;
+      }
+
+      if (paymentMethods && Array.isArray(paymentMethods)) {
+        customer.paymentMethods = paymentMethods;
+      }
+
+      if (loyaltyPoints) customer.loyaltyPoints = loyaltyPoints;
+
+      await customer.save();
+
+      res.json({ message: "Customer updated successfully", customer });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// @route   GET /customer/login
+// @desc    Login a customer using user name and password
+// @access  PUBLIC
 router.get(
   "/customer/login",
   [
@@ -107,13 +219,55 @@ router.get(
     }
   }
 );
-//#endregion
 
-//#region CUSTOMER PASSWORD RECOVERY
-// Customer forgot password
+// @route   GET /customer/get
+// @desc    Get logged in customer details
+// @access  PRIVATE
 router.get(
+  "/customer/get/:id",
+  authMiddleware.authenticateJWT,
+  param("id").isMongoId().withMessage("Invalid customer Id"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (req.user.id !== id) {
+        return res
+          .status(403)
+          .json({ message: "Unauthorized to get this profile" });
+      }
+
+      const customer = await Customer.findById(id).populate("orders");
+
+      if (!customer) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(200).json({
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: customer.email,
+        phone: customer.phone,
+        loyaltyPoints: customer.loyaltyPoints,
+        deliveryAddresses: customer.deliveryAddresses,
+        paymentMethods: customer.paymentMethods,
+        orders: customer.orders,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// @route   POST /customer/forgot-password
+// @desc    Initiate password recovery
+// @access  PUBLIC
+router.post(
   "/customer/forgot-password",
-  [...emailValidation()],
+  [
+    param("token").isString().withMessage("Invalid password reset token"),
+    ...emailValidation(),
+  ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -128,15 +282,16 @@ router.get(
         return res.status(400).json({ message: "User not found" });
       }
 
-      // Generate a password reset token
       const resetToken = crypto.randomBytes(20).toString("hex");
-      const resetExpiry = Date.now() + 3600000; // Token valid for 1 hour
+
+      const resetExpiryInMillis =
+        parseInt(PASSWORD_RESET_TOKEN_EXPIRY, 10) || 3600000;
+      const resetExpiry = new Date(Date.now() + resetExpiryInMillis);
 
       customer.resetPasswordToken = resetToken;
-      customer.resetPasswordExpiry = resetExpiry;
+      customer.resetPasswordExpiry = new Date(resetExpiry);
       await customer.save();
 
-      // Send email with the reset link using the email utility
       const resetLink = `${FRONTEND_URL}/customer/reset-password/${resetToken}`;
       const htmlContent = `<p>You requested a password reset. Click the link below to reset your password:</p><a href="${resetLink}">Reset Password</a>`;
 
@@ -151,7 +306,9 @@ router.get(
   }
 );
 
-// Customer reset password
+// @route   POST /customer/reset-password
+// @desc    Reset password using token
+// @access  PUBLIC
 router.post(
   "/customer/reset-password/:token",
   [...passwordValidation()],
@@ -159,7 +316,6 @@ router.post(
     const { token } = req.params;
     const { password } = req.body;
 
-    // Validate the incoming data
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -175,11 +331,9 @@ router.post(
         return res.status(400).json({ message: "Invalid or expired token" });
       }
 
-      // Hash the new password
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // Update password and clear reset token
       customer.passwordHash = hashedPassword;
       customer.resetPasswordToken = undefined;
       customer.resetPasswordExpiry = undefined;
@@ -191,9 +345,8 @@ router.post(
     }
   }
 );
-//#endregion
 
-//#region CUSTOMER OAUTH LOGIN
+/* TO BE USED IF OAUTH IS REQUIRED
 // OAuth Strategy Handler
 async function handleOAuthLogin(profile, provider, done) {
   try {
@@ -301,7 +454,6 @@ router.get(
     res.json({ token });
   }
 );
-//#endregion
+*/
 
-//#endregion
 module.exports = router;

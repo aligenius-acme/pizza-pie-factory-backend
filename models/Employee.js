@@ -1,28 +1,31 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
+const { Roles } = require("../utils/enums");
+
 const EmployeeSchema = new Schema(
   {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    email: { type: String, required: true, unique: true, match: /.+\@.+\..+/ },
+    email: { type: String, required: true, unique: true },
     phone: {
       type: String,
       required: true,
       unique: true,
-      match: /^((\+971\s?|00971\s?|0)5[024568]\d{7})$/, // Dubai phone number validation
     },
     passwordHash: { type: String, required: true },
     role: {
       type: String,
       required: true,
-      enum: ["Kitchen Staff, ", "Delivery Driver", "Customer Support"],
+      enum: Object.values(Roles),
     },
     branchId: {
       type: Schema.Types.ObjectId,
       ref: "Branch",
       required: true,
     },
+    resetPasswordToken: { type: String },
+    resetPasswordExpiry: { type: Date },
   },
   { timestamps: true }
 );

@@ -8,18 +8,30 @@ const { Schema } = mongoose;
 
 const CustomerSchema = new Schema(
   {
-    firstName: { type: String },
-    lastName: { type: String },
-    email: { type: String, unique: true },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, unique: true, required: true },
     phone: {
       type: String,
       unique: true,
+      required: true,
     },
-    passwordHash: { type: String },
+    isGuest: { type: Boolean, default: false },
+    passwordHash: {
+      type: String,
+      required: function () {
+        return !this.isGuest;
+      },
+    },
     authProvider: {
       type: String,
       enum: Object.values(AuthProviders),
-      required: true,
+      required: function () {
+        return !this.isGuest;
+      },
+      default: function () {
+        return this.isGuest ? AuthProviders.GUEST : undefined;
+      },
     },
     authProviderId: { type: String, unique: true, sparse: true },
     deliveryAddresses: [
@@ -34,24 +46,26 @@ const CustomerSchema = new Schema(
     paymentMethods: [
       {
         paymentType: { type: String, enum: Object.values(PaymentTypes) },
-        cardType: {
-          type: String,
-        },
-        cardNumber: {
-          type: String,
-        },
-        expiryDate: {
-          type: String,
-        },
+        storedCardToken: { type: String },
         saveForFuture: { type: Boolean, default: false },
       },
     ],
     loyaltyPoints: { type: Number, default: 0, min: 0 },
-    orderHistory: [{ type: Schema.Types.ObjectId, ref: "Order" }],
     resetPasswordToken: { type: String },
     resetPasswordExpiry: { type: Date },
   },
   { timestamps: true }
 );
+
+// Set virtuals to be included when converting documents to JSON or Objects
+CustomerSchema.set("toJSON", { virtuals: true });
+CustomerSchema.set("toObject", { virtuals: true });
+
+// Define the virtual field for orders
+CustomerSchema.virtual("orders", {
+  ref: "Order", // The model to use
+  localField: "_id", // Find orders where `localField`
+  foreignField: "customerId", // is equal to `foreignField`
+});
 
 module.exports = mongoose.model("Customer", CustomerSchema);

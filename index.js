@@ -18,6 +18,8 @@ app.use(passport.initialize());
 
 // Available Routes
 app.use("/api", require("./routes/auth"));
+app.use("/api", require("./routes/admin/employee"));
+app.use("/api", require("./routes/admin/branch"));
 
 app.listen(port, () => {
   console.log(`Pizza Pie Factory backend app listening on port ${port}`);
