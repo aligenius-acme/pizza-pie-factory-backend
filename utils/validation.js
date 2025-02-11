@@ -1,4 +1,4 @@
-const { Roles } = require("../utils/enums");
+const { Roles, RecipientTypes, NotificationTypes } = require("../utils/enums");
 const { body } = require("express-validator");
 
 // Password validation logic
@@ -95,6 +95,130 @@ const branchValidation = () => [
   body("contactNumber").notEmpty().withMessage("Contact number is required"),
 ];
 
+// Calegory validation logic
+const categoryValidation = () => [
+  body("name").notEmpty().withMessage("Branch name is required"),
+];
+
+// Employee message validation logic
+const employeeMessageValidation = () => [
+  body("message").notEmpty().withMessage("Message is required"),
+  body("receiverId").isMongoId().withMessage("Invalid receiver ID"),
+];
+
+// Notification validation logic
+const notificationValidation = [
+  body("recipientType")
+    .notEmpty()
+    .withMessage("Recipient type is required")
+    .isIn(Object.values(RecipientTypes))
+    .withMessage("Invalid recipient type"),
+  body("message").notEmpty().withMessage("Message is required"),
+  body("type")
+    .notEmpty()
+    .withMessage("Notification type is required")
+    .isIn(Object.values(NotificationTypes))
+    .withMessage("Invalid notification type"),
+  body().custom((value) => {
+    if (value.recipientType === RecipientTypes.CUSTOMER && !value.recipientId) {
+      throw new Error("For Customer notifications, recipientId is required.");
+    }
+    if (value.recipientType === RecipientTypes.BRANCH && !value.branchId) {
+      throw new Error("For Branch notifications, branchId is required.");
+    }
+    return true;
+  }),
+];
+
+// Cart validation logic
+const cartValidation = [
+  // Conditionally require customerId only if the cart is not for a guest.
+  body("customerId")
+    .if((value, { req }) => !req.body.isGuest)
+    .notEmpty()
+    .withMessage("Customer ID is required")
+    .isMongoId()
+    .withMessage("Invalid customer ID"),
+  // Items array validation
+  body("items")
+    .isArray({ min: 1 })
+    .withMessage("Items must be an array with at least one item"),
+  body("items.*.foodItemId")
+    .notEmpty()
+    .withMessage("Food item ID is required for each item")
+    .isMongoId()
+    .withMessage("Invalid food item ID"),
+  body("items.*.quantity")
+    .notEmpty()
+    .withMessage("Quantity is required for each item")
+    .isNumeric()
+    .withMessage("Quantity must be a number")
+    .custom((value) => value >= 1)
+    .withMessage("Quantity must be at least 1"),
+  body("totalAmount")
+    .notEmpty()
+    .withMessage("Total amount is required")
+    .isNumeric()
+    .withMessage("Total amount must be a number")
+    .custom((value) => value >= 0)
+    .withMessage("Total amount must be non-negative"),
+];
+
+// Food item validation logic
+const foodItemValidation = () => [
+  body("name").notEmpty().withMessage("Food item name is required"),
+  body("price")
+    .notEmpty()
+    .withMessage("Price is required")
+    .isNumeric()
+    .withMessage("Price must be a number"),
+];
+
+// Order validation logic
+const orderValidation = () => [
+  body("customerId").isMongoId().withMessage("Invalid customer ID"),
+  body("branchId").isMongoId().withMessage("Invalid branch ID"),
+  body("items")
+    .isArray({ min: 1 })
+    .withMessage("Items must be an array with at least one item"),
+  body("items.*.foodItemId").isMongoId().withMessage("Invalid food item ID"),
+  body("items.*.quantity")
+    .isInt({ min: 1 })
+    .withMessage("Quantity must be at least 1"),
+  body("orderType")
+    .isIn(Object.values(OrderTypes))
+    .withMessage("Invalid order type"),
+  body("status")
+    .isIn(Object.values(OrderStatusses))
+    .withMessage("Invalid status"),
+  body("paymentMethod")
+    .isIn(Object.values(PaymentTypes))
+    .withMessage("Invalid payment method"),
+  body("totalAmount")
+    .isFloat({ min: 0 })
+    .withMessage("Total amount must be a positive number"),
+  body("discount")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Discount must be a positive number"),
+  body("instructions")
+    .optional()
+    .isString()
+    .withMessage("Instructions must be a string"),
+  body("deliveryAddress.address")
+    .optional()
+    .isString()
+    .withMessage("Invalid address"),
+  body("deliveryAddress.latitude")
+    .optional()
+    .isFloat()
+    .withMessage("Invalid latitude"),
+  body("deliveryAddress.longitude")
+    .optional()
+    .isFloat()
+    .withMessage("Invalid longitude"),
+];
+
 module.exports = {
   passwordValidation,
   emailValidation,
@@ -103,4 +227,10 @@ module.exports = {
   roleValidation,
   branchValidation,
   addressValidation,
+  categoryValidation,
+  foodItemValidation,
+  employeeMessageValidation,
+  notificationValidation,
+  cartValidation,
+  orderValidation,
 };

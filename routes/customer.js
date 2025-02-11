@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 
 /* TO BE USED IF OAUTH IS REQUIRED
 const passport = require("passport");
@@ -109,7 +110,7 @@ router.post(
       const token = jwt.sign({ id: customer._id }, JWT_SECRET, {
         expiresIn: JWT_EXPIRY,
       });
-      res.json({ token });
+      res.status(200).json({ token });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -175,7 +176,7 @@ router.put(
 
       await customer.save();
 
-      res.json({ message: "Customer updated successfully", customer });
+      res.status(200).json(customer);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -213,7 +214,7 @@ router.get(
         JWT_SECRET,
         { expiresIn: JWT_EXPIRY }
       );
-      res.json({ token });
+      res.status(200).json({ token });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -229,30 +230,30 @@ router.get(
   param("id").isMongoId().withMessage("Invalid customer Id"),
   async (req, res) => {
     try {
-      const { id } = req.params;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
 
+      const { id } = req.params;
       if (req.user.id !== id) {
         return res
           .status(403)
           .json({ message: "Unauthorized to get this profile" });
       }
 
-      const customer = await Customer.findById(id).populate("orders");
-
+      let customer = await Customer.findById(id);
       if (!customer) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.status(200).json({
-        firstName: customer.firstName,
-        lastName: customer.lastName,
-        email: customer.email,
-        phone: customer.phone,
-        loyaltyPoints: customer.loyaltyPoints,
-        deliveryAddresses: customer.deliveryAddresses,
-        paymentMethods: customer.paymentMethods,
-        orders: customer.orders,
-      });
+      if (mongoose.modelNames().includes("Order")) {
+        await customer.populate("orders");
+      } else {
+        customer.orders = [];
+      }
+
+      res.status(200).json(customer);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -298,7 +299,7 @@ router.post(
       await sendEmail(email, "Password Reset Request", htmlContent);
 
       res
-        .status(200)
+        .status(204)
         .json({ message: "Password reset link has been sent to your email" });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -339,7 +340,7 @@ router.post(
       customer.resetPasswordExpiry = undefined;
 
       await customer.save();
-      res.status(200).json({ message: "Password has been successfully reset" });
+      res.status(204).json({ message: "Password has been successfully reset" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

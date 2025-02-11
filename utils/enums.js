@@ -26,6 +26,7 @@ const OrderStatusses = Object.freeze({
   PREPARING: "Preparing",
   OUT_FOR_DELIVERY: "Out For Delivery",
   DELIVERED: "Delivered",
+  NEW_ORDER: "New Order Received",
 });
 
 const Roles = Object.freeze({
@@ -33,6 +34,17 @@ const Roles = Object.freeze({
   DELIVERY_DRIVER: "Delivery Driver",
   CUSTOMER_SUPPORT: "Customer Support",
   SITE_ADMIN: "Site Admin",
+});
+
+const RecipientTypes = Object.freeze({
+  CUSTOMER: "Customer",
+  EMPLOYEE: "Employee",
+});
+
+const NotificationTypes = Object.freeze({
+  NEW_ORDER: "New Order",
+  ORDER_UPDATE: "Order Update",
+  PROMOTION: "Promotion",
 });
 
 module.exports = {
@@ -43,4 +55,6 @@ module.exports = {
   OrderTypes,
   OrderStatusses,
   PaymentTypes,
+  RecipientTypes,
+  NotificationTypes,
 };

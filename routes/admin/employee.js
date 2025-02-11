@@ -74,7 +74,7 @@ router.post(
         JWT_SECRET,
         { expiresIn: JWT_EXPIRY }
       );
-      res.json({ token });
+      res.status(200).json({ token });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -132,9 +132,7 @@ router.put(
 
       await employee.save();
 
-      res
-        .status(200)
-        .json({ message: "Employee updated successfully", employee });
+      res.status(200).json(employee);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -174,7 +172,7 @@ router.get(
         { expiresIn: JWT_EXPIRY }
       );
 
-      res.json({ token });
+      res.status(200).json({ token });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -202,16 +200,7 @@ router.get(
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      res.status(200).json({
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        email: employee.email,
-        phone: employee.phone,
-        role: employee.role,
-        branch: employee.branchId
-          ? employee.branchId.name
-          : "No branch assigned", // assuming branch has a 'name' field
-      });
+      res.status(200).json(employee);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -253,7 +242,7 @@ router.post(
       await sendEmail(email, "Password Reset Request", htmlContent);
 
       res
-        .status(200)
+        .status(204)
         .json({ message: "Password reset link has been sent to your email" });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -297,7 +286,7 @@ router.post(
       employee.resetPasswordExpiry = undefined;
 
       await employee.save();
-      res.status(200).json({ message: "Password has been successfully reset" });
+      res.status(204).json({ message: "Password has been successfully reset" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

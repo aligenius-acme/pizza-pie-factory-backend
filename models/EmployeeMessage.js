@@ -19,4 +19,7 @@ const EmployeeMessageSchema = new Schema(
   { timestamps: true }
 );
 
+EmployeeMessageSchema.set("toJSON", { virtuals: true });
+EmployeeMessageSchema.set("toObject", { virtuals: true });
+
 module.exports = mongoose.model("EmployeeMessage", EmployeeMessageSchema);

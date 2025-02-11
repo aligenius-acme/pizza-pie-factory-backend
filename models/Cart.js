@@ -16,9 +16,9 @@ const CartSchema = new Schema(
           required: true,
         },
         quantity: { type: Number, required: true, min: 1 },
-        customizations: {
-          extraToppings: [{ type: String }],
-          spiceLevel: { type: String, enum: ["Mild", "Medium", "Spicy"] },
+        customizationOptions: {
+          type: Schema.Types.Mixed,
+          default: {},
         },
       },
     ],

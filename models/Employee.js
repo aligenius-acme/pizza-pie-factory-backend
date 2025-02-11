@@ -30,4 +30,14 @@ const EmployeeSchema = new Schema(
   { timestamps: true }
 );
 
+// Set virtuals to be included when converting documents to JSON or Objects
+EmployeeSchema.set("toJSON", {
+  virtuals: true,
+  transform: function (doc, ret) {
+    delete ret.passwordHash;
+    return ret;
+  },
+});
+EmployeeSchema.set("toObject", { virtuals: true });
+
 module.exports = mongoose.model("Employee", EmployeeSchema);

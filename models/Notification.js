@@ -1,22 +1,23 @@
 const mongoose = require("mongoose");
+const { RecipientTypes, NotificationTypes } = require("../../utils/enums");
 const { Schema } = mongoose;
 
-const NotificationSchema = Schema(
+const NotificationSchema = new Schema(
   {
-    recipientId: { type: Schema.Types.ObjectId, required: true },
     recipientType: {
       type: String,
       required: true,
-      enum: ["Customer", "Employee"],
+      enum: Object.values(RecipientTypes),
     },
+    recipientId: { type: Schema.Types.ObjectId, ref: "Customer" },
+    branchId: { type: Schema.Types.ObjectId, ref: "Branch" },
     message: { type: String, required: true },
     type: {
       type: String,
       required: true,
-      enum: ["NewOrder", "OrderUpdate", "Promotion"],
+      enum: Object.values(NotificationTypes),
     },
     relatedOrderId: { type: Schema.Types.ObjectId, ref: "Order" },
-    branchId: { type: Schema.Types.ObjectId, ref: "Branch" },
     read: { type: Boolean, default: false },
   },
   { timestamps: true }

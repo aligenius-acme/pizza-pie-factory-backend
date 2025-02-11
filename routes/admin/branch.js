@@ -1,5 +1,5 @@
 const express = require("express");
-const { param, query, validationResult } = require("express-validator");
+const { param, validationResult } = require("express-validator");
 const { branchValidation, phoneValidation } = require("../../utils/validation");
 const Branch = require("../../models/Branch");
 
@@ -70,7 +70,7 @@ router.put(
       });
       if (!branch) return res.status(404).json({ message: "Branch not found" });
 
-      res.json(branch);
+      res.status(200).json(branch);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -84,30 +84,10 @@ router.get(
   "/admin/branches",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
-  [
-    query("includeEmployees")
-      .optional()
-      .isBoolean()
-      .withMessage("Invalid value for include employees"),
-    query("includeOrders")
-      .optional()
-      .isBoolean()
-      .withMessage("Invalid value for include 0rders"),
-  ],
   async (req, res) => {
     try {
-      const { includeEmployees, includeOrders } = req.query;
-
-      let query = Branch.find();
-      if (includeEmployees === true) {
-        query = query.populate("employees");
-      }
-      if (includeOrders === true) {
-        query = query.populate("orders");
-      }
-
-      const branches = await query.exec();
-      res.json(branches);
+      const branches = await Branch.find();
+      res.status(200).json(branches);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -121,17 +101,7 @@ router.get(
   "/admin/branch/get/:id",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
-  [
-    param("id").isMongoId().withMessage("Invalid Branch ID"),
-    query("includeEmployees")
-      .optional()
-      .isBoolean()
-      .withMessage("Invalid value for include employees"),
-    query("includeOrders")
-      .optional()
-      .isBoolean()
-      .withMessage("Invalid value for include orders"),
-  ],
+  param("id").isMongoId().withMessage("Invalid Branch ID"),
   async (req, res) => {
     try {
       const errors = validationResult(req);
@@ -139,20 +109,10 @@ router.get(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { includeEmployees, includeOrders } = req.query;
-      let query = Branch.findById(req.params.id);
-
-      if (includeEmployees === true) {
-        query = query.populate("employees");
-      }
-      if (includeOrders === true) {
-        query = query.populate("orders");
-      }
-
-      const branch = await query.exec();
+      const branch = await Branch.findById(req.params.id);
       if (!branch) return res.status(404).json({ message: "Branch not found" });
 
-      res.json(branch);
+      res.status(200).json(branch);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

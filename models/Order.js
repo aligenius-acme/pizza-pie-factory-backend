@@ -23,8 +23,7 @@ const OrderSchema = new Schema(
           required: true,
         },
         quantity: { type: Number, required: true, min: 1 },
-        // Allow any type of customization data
-        customizations: {
+        customizationOptions: {
           type: Schema.Types.Mixed,
           default: {},
         },

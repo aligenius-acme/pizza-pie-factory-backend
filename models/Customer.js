@@ -58,7 +58,13 @@ const CustomerSchema = new Schema(
 );
 
 // Set virtuals to be included when converting documents to JSON or Objects
-CustomerSchema.set("toJSON", { virtuals: true });
+CustomerSchema.set("toJSON", {
+  virtuals: true,
+  transform: function (doc, ret) {
+    delete ret.passwordHash;
+    return ret;
+  },
+});
 CustomerSchema.set("toObject", { virtuals: true });
 
 // Define the virtual field for orders
