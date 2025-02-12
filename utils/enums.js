@@ -1,12 +1,3 @@
-// enums.js
-const AuthProviders = Object.freeze({
-  GOOGLE: "Google",
-  APPLE: "Apple",
-  FACEBOOK: "Facebook",
-  LOCAL: "Local",
-  GUEST: "Guest",
-});
-
 const PaymentTypes = Object.freeze({
   CREDIT_CARD: "Credit Card",
   COD: "COD",
@@ -14,7 +5,8 @@ const PaymentTypes = Object.freeze({
 
 const AddressLabels = Object.freeze({
   HOME: "Home",
-  OFFICE: "Office",
+  APARTMENT: "Apartment",
+  OTHER: "Other",
 });
 
 const OrderTypes = Object.freeze({
@@ -48,7 +40,6 @@ const NotificationTypes = Object.freeze({
 });
 
 module.exports = {
-  AuthProviders,
   PaymentTypes,
   AddressLabels,
   Roles,

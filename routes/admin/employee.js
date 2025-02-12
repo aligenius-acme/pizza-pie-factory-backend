@@ -2,79 +2,70 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { param, body, validationResult } = require("express-validator");
+const { param } = require("express-validator");
 const Employee = require("../../models/Employee");
+const Branch = require("../../models/Branch");
 const authMiddleware = require("../../middleware/auth");
 const { sendEmail } = require("../../utils/email");
+const { employeeValidation } = require("../../utils/validation");
 const {
-  passwordValidation,
-  emailValidation,
-  phoneValidation,
-  nameValidation,
-  roleValidation,
-} = require("../../utils/validation");
+  generateToken,
+  validateRequest,
+  hashPassword,
+} = require("../../utils/helpers");
 require("dotenv").config();
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRY = process.env.JWT_EXPIRY;
-const FRONTEND_URL = process.env.FRONTEND_URL;
-const PASSWORD_RESET_TOKEN_EXPIRY = process.env.PASSWORD_RESET_TOKEN_EXPIRY;
+const { FRONTEND_URL, PASSWORD_RESET_TOKEN_EXPIRY } = process.env;
 
 // @route   POST /admin/employee/register
-// @desc    Register new employee using user name and password
 // @access  PRIVATE (Admin Only)
 router.post(
   "/admin/employee/register",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [
-    ...nameValidation(),
-    ...emailValidation(),
-    ...phoneValidation(),
-    ...passwordValidation(),
-    ...roleValidation(),
-    body("branchId")
-      .notEmpty()
-      .withMessage("Branch is required")
-      .isMongoId()
-      .withMessage("Invalid branch"),
-  ],
+  // authMiddleware.authenticateJWT,
+  // authMiddleware.authenticateAdmin,
+  [employeeValidation.all()],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      if (validateRequest(req, res)) return;
+
+      const allowedFields = [
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "password",
+        "role",
+        "branchId",
+      ];
+
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) => allowedFields.includes(key) && value !== undefined
+        )
+      );
+
+      const branch = await Branch.findById(filteredBody.branchId).lean();
+      if (!branch) {
+        return res.status(400).json({ message: "Invalid branch ID" });
       }
 
-      const { firstName, lastName, email, phone, password, role, branchId } =
-        req.body;
+      let existingEmployee = await Employee.findOne({
+        email: filteredBody.email,
+      }).lean();
 
-      let employee = await Employee.findOne({ email });
-      if (employee) {
-        return res.status(400).json({ message: "User already exists" });
+      if (existingEmployee) {
+        return res.status(400).json({ message: "Employee already exists" });
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(password, salt);
+      filteredBody.password = await hashPassword(filteredBody.password);
 
-      employee = new Employee({
-        firstName,
-        lastName,
-        email,
-        phone,
-        passwordHash,
-        role,
-        branchId,
-      });
+      const employee = new Employee(filteredBody);
       await employee.save();
 
-      const token = jwt.sign(
-        { id: employee._id, role: employee.role },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRY }
-      );
-      res.status(200).json({ token });
+      res.status(201).json({
+        token: generateToken(employee._id, { role: employee.role }),
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -82,54 +73,47 @@ router.post(
 );
 
 // @route   PUT /admin/employee/update/:id
-// @desc    Update employee details (excluding password)
 // @access  PRIVATE (Admin Only)
 router.put(
   "/admin/employee/update/:id",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
   [
-    param("id").isMongoId().withMessage("Invalid employee Id"),
-    ...nameValidation(),
-    ...emailValidation(),
-    ...phoneValidation(),
-    ...passwordValidation(),
-    ...roleValidation(),
-    body("branchId")
-      .notEmpty()
-      .withMessage("Branch is required")
-      .isMongoId()
-      .withMessage("Invalid branch"),
+    param("id").isMongoId().withMessage("Invalid employee ID"),
+    employeeValidation.all(),
   ],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { id } = req.params;
-
-    if (req.user.id !== id) {
-      return res
-        .status(403)
-        .json({ message: "Unauthorized to update this profile" });
-    }
-
-    const { firstName, lastName, email, phone, role, branchId } = req.body;
-
     try {
-      let employee = await Employee.findById(id);
+      if (validateRequest(req, res)) return;
+
+      const { id } = req.params;
+
+      const allowedFields = [
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "password",
+        "role",
+        "branchId",
+      ];
+
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) => allowedFields.includes(key) && value !== undefined
+        )
+      );
+
+      let employee = await Employee.findById(id).select("-password");
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      if (firstName) employee.firstName = firstName;
-      if (lastName) employee.lastName = lastName;
-      if (email) employee.email = email;
-      if (phone) employee.phone = phone;
-      if (role) employee.role = role;
-      if (branchId) employee.branchId = branchId;
+      if (filteredBody.password) {
+        filteredBody.password = await hashPassword(filteredBody.password);
+      }
 
+      Object.assign(employee, filteredBody);
       await employee.save();
 
       res.status(200).json(employee);
@@ -140,39 +124,24 @@ router.put(
 );
 
 // @route   GET /admin/employee/login
-// @desc    Login an employee using email and password
 // @access  PUBLIC
 router.get(
   "/admin/employee/login",
-  [
-    ...emailValidation(),
-    body("password").notEmpty().withMessage("Password is required"),
-  ],
+  [employeeValidation.email, employeeValidation.password],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
+      if (validateRequest(req, res)) return;
       const { email, password } = req.body;
-      const employee = await Employee.findOne({ email });
+
+      const employee = await Employee.findOne({ email }).lean();
       if (!employee) return res.status(400).json({ message: "User not found" });
 
-      const isMatch = await bcrypt.compare(password, employee.passwordHash);
-      if (!isMatch)
+      if (!(await bcrypt.compare(password, employee.password)))
         return res.status(400).json({ message: "Invalid credentials" });
 
-      const token = jwt.sign(
-        {
-          id: employee._id,
-          role: employee.role,
-        },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRY }
-      );
-
-      res.status(200).json({ token });
+      res.status(200).json({
+        token: generateToken(employee._id, { role: employee.role }),
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -180,22 +149,18 @@ router.get(
 );
 
 // @route   GET /admin/employee/get:id
-// @desc    Get logged in employee details
 // @access  PRIVATE
 router.get(
   "/admin/employee/get/:id",
   authMiddleware.authenticateJWT,
-  param("id").isMongoId().withMessage("Invalid employee Id"),
+  [param("id").isMongoId().withMessage("Invalid employee ID")],
   async (req, res) => {
     try {
+      if (validateRequest(req, res)) return;
+
       const { id } = req.params;
 
-      if (req.user.id !== id) {
-        return res
-          .status(403)
-          .json({ message: "Unauthorized to get this profile" });
-      }
-      const employee = await Employee.findById(id);
+      const employee = await Employee.findById(id).select("-password").lean();
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
@@ -208,42 +173,42 @@ router.get(
 );
 
 // @route   POST admin/employee/forgot-password
-// @desc    Initiate password recovery
 // @access  PUBLIC
 router.post(
   "/admin/employee/forgot-password",
-  [...emailValidation()],
+  [employeeValidation.email],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email } = req.body;
-
     try {
+      if (validateRequest(req, res)) return;
+
+      const { email } = req.body;
       const employee = await Employee.findOne({ email });
-      if (!employee) {
-        return res.status(400).json({ message: "User not found" });
+      if (!employee) return res.status(400).json({ message: "User not found" });
+
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      employee.resetPasswordToken = resetToken;
+      employee.resetPasswordExpiry =
+        Date.now() + (parseInt(PASSWORD_RESET_TOKEN_EXPIRY, 10) || 3600000);
+
+      await employee.save();
+      const resetLink = `${FRONTEND_URL}/employee/reset-password/${resetToken}`;
+
+      try {
+        await sendEmail(
+          email,
+          "Password Reset Request",
+          `<p>Click below to reset your password:</p> <a href="${resetLink}">Reset Password</a>`
+        );
+      } catch (emailError) {
+        return res.status(500).json({
+          message: "Failed to send reset email",
+          error: emailError.message,
+        });
       }
 
-      const resetToken = crypto.randomBytes(20).toString("hex");
-      const resetExpiryInMillis =
-        parseInt(PASSWORD_RESET_TOKEN_EXPIRY, 10) || 3600000;
-      const resetExpiry = new Date(Date.now() + resetExpiryInMillis);
-
-      employee.resetPasswordToken = resetToken;
-      employee.resetPasswordExpiry = resetExpiry;
-      await employee.save();
-
-      const resetLink = `${FRONTEND_URL}/employee/reset-password/${resetToken}`;
-      const htmlContent = `<p>You requested a password reset. Click the link below to reset your password:</p><a href="${resetLink}">Reset Password</a>`;
-
-      await sendEmail(email, "Password Reset Request", htmlContent);
-
-      res
-        .status(204)
-        .json({ message: "Password reset link has been sent to your email" });
+      res.status(200).json({
+        message: "Password reset link sent to your email",
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -251,24 +216,17 @@ router.post(
 );
 
 // @route   POST /admin/employee/reset-password
-// @desc    Reset password using token
 // @access  PUBLIC
 router.post(
   "/admin/employee/reset-password/:token",
-  [
-    param("token").isString().withMessage("Invalid password reset token"),
-    ...passwordValidation(),
-  ],
+  [param("token").isString().withMessage("Invalid password reset token")],
   async (req, res) => {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
     try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      if (validateRequest(req, res)) return;
+
       const employee = await Employee.findOne({
         resetPasswordToken: token,
         resetPasswordExpiry: { $gt: Date.now() },
@@ -278,15 +236,12 @@ router.post(
         return res.status(400).json({ message: "Invalid or expired token" });
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      employee.passwordHash = hashedPassword;
+      employee.password = await hashPassword(password);
       employee.resetPasswordToken = undefined;
       employee.resetPasswordExpiry = undefined;
 
       await employee.save();
-      res.status(204).json({ message: "Password has been successfully reset" });
+      res.status(200).json({ message: "Password reset successful" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

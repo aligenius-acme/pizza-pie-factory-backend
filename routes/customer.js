@@ -3,114 +3,68 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const { param } = require("express-validator");
 
-/* TO BE USED IF OAUTH IS REQUIRED
-const passport = require("passport");
-const { Strategy: GoogleStrategy } = require("passport-google-oauth20");
-const { Strategy: AppleStrategy } = require("passport-apple");
-const { Strategy: FacebookStrategy } = require("passport-facebook");
-*/
-
-const { param, body, validationResult } = require("express-validator");
 const Customer = require("../models/Customer");
 const authMiddleware = require("../middleware/auth");
-const { AuthProviders } = require("../utils/enums");
 const { sendEmail } = require("../utils/email");
+const { customerValidation } = require("../utils/validation");
 const {
-  passwordValidation,
-  emailValidation,
-  phoneValidation,
-  nameValidation,
-  addressValidation,
-} = require("../utils/validation");
+  generateToken,
+  validateRequest,
+  hashPassword,
+} = require("../utils/helpers");
 require("dotenv").config();
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRY = process.env.JWT_EXPIRY;
-const FRONTEND_URL = process.env.FRONTEND_URL;
-const PASSWORD_RESET_TOKEN_EXPIRY = process.env.PASSWORD_RESET_TOKEN_EXPIRY;
+const { FRONTEND_URL, PASSWORD_RESET_TOKEN_EXPIRY } = process.env;
 
 // @route   POST /customer/register
-// @desc    Register a new customer using user name and password
 // @access  PUBLIC
 router.post(
   "/customer/register",
-  [
-    ...nameValidation(),
-    ...emailValidation(),
-    ...phoneValidation(),
-    ...passwordValidation(),
-  ],
+  [customerValidation.all()],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
-      const {
-        firstName,
-        lastName,
-        email,
-        phone,
-        password,
-        deliveryAddresses,
-        paymentMethods,
-        isGuest,
-      } = req.body;
+      const allowedFields = [
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "password",
+        "deliveryAddresses",
+        "paymentMethods",
+        "isGuest",
+      ];
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) => allowedFields.includes(key) && value !== undefined
+        )
+      );
 
-      let customer = await Customer.findOne({ email });
+      let customer =
+        !filteredBody.isGuest && filteredBody.email
+          ? await Customer.findOne({ email: filteredBody.email }).lean()
+          : null;
 
       if (customer) {
-        if (customer.isGuest && isGuest) {
-          customer.firstName = firstName;
-          customer.lastName = lastName;
-          customer.phone = phone;
-          customer.deliveryAddresses = deliveryAddresses;
-          customer.paymentMethods = paymentMethods;
+        if (customer.isGuest && filteredBody.isGuest) {
+          Object.assign(customer, filteredBody);
           await customer.save();
-
-          const token = jwt.sign({ id: customer._id }, JWT_SECRET, {
-            expiresIn: JWT_EXPIRY,
-          });
-          return res.json({ token });
+          return res.status(201).json({ token: generateToken(customer._id) });
         }
-        return res.status(400).json({ message: "User already exists" });
-      }
-      if (isGuest) {
-        customer = new Customer({
-          firstName,
-          lastName,
-          email,
-          phone,
-          deliveryAddresses,
-          paymentMethods,
-          isGuest: true,
-        });
-      } else {
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-        customer = new Customer({
-          firstName,
-          lastName,
-          email,
-          phone,
-          passwordHash,
-          authProvider: AuthProviders.LOCAL,
-          deliveryAddresses,
-          paymentMethods,
-          isGuest: false,
-        });
+        return res.status(400).json({ message: "Customer already exists" });
       }
 
+      if (!filteredBody.isGuest)
+        filteredBody.password = await hashPassword(filteredBody.password);
+
+      customer = new Customer(filteredBody);
       await customer.save();
 
-      // Generate token
-      const token = jwt.sign({ id: customer._id }, JWT_SECRET, {
-        expiresIn: JWT_EXPIRY,
-      });
-      res.status(200).json({ token });
+      res.status(201).json({ token: generateToken(customer._id) });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -118,62 +72,49 @@ router.post(
 );
 
 // @route   PUT /customer/update/:id
-// @desc    Update customer details, including delivery addresses
 // @access  PRIVATE
 router.put(
   "/customer/update/:id",
   authMiddleware.authenticateJWT,
   [
-    param("id").isMongoId().withMessage("Invalid customer Id"),
-    ...nameValidation(),
-    ...emailValidation(),
-    ...phoneValidation(),
-    ...addressValidation(),
+    param("id").isMongoId().withMessage("Invalid customer ID"),
+    customerValidation.all(),
   ],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-
-      if (req.user.id !== id) {
+      if (req.user.id !== id)
         return res
           .status(403)
           .json({ message: "Unauthorized to update this profile" });
-      }
 
-      const {
-        firstName,
-        lastName,
-        email,
-        phone,
-        deliveryAddresses,
-        paymentMethods,
-        loyaltyPoints,
-      } = req.body;
+      const allowedFields = [
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "password",
+        "deliveryAddresses",
+        "paymentMethods",
+        "loyaltyPoints",
+        "isGuest",
+      ];
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) => allowedFields.includes(key) && value !== undefined
+        )
+      );
 
-      let customer = await Customer.findById(id);
+      let customer = await Customer.findById(id).select("-password");
       if (!customer)
         return res.status(404).json({ message: "Customer not found" });
 
-      if (firstName) customer.firstName = firstName;
-      if (lastName) customer.lastName = lastName;
-      if (email) customer.email = email;
-      if (phone) customer.phone = phone;
+      if (filteredBody.password)
+        filteredBody.password = await hashPassword(filteredBody.password);
 
-      if (deliveryAddresses && Array.isArray(deliveryAddresses)) {
-        customer.deliveryAddresses = deliveryAddresses;
-      }
-
-      if (paymentMethods && Array.isArray(paymentMethods)) {
-        customer.paymentMethods = paymentMethods;
-      }
-
-      if (loyaltyPoints) customer.loyaltyPoints = loyaltyPoints;
-
+      Object.assign(customer, filteredBody);
       await customer.save();
 
       res.status(200).json(customer);
@@ -183,74 +124,47 @@ router.put(
   }
 );
 
-// @route   GET /customer/login
-// @desc    Login a customer using user name and password
+// @route   POST /customer/login
 // @access  PUBLIC
-router.get(
+router.post(
   "/customer/login",
-  [
-    ...emailValidation(),
-    body("password").notEmpty().withMessage("Password is required"),
-  ],
+  [customerValidation.email, customerValidation.password],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
       const { email, password } = req.body;
-      const customer = await Customer.findOne({ email });
+      const customer = await Customer.findOne({ email }).lean();
       if (!customer) return res.status(400).json({ message: "User not found" });
-      const isMatch = await bcrypt.compare(password, customer.passwordHash);
-      if (!isMatch)
+
+      if (!(await bcrypt.compare(password, customer.password)))
         return res.status(400).json({ message: "Invalid credentials" });
 
-      const token = jwt.sign(
-        {
-          id: customer._id,
-          authProvider: customer.authProvider,
-          authProviderId: customer.authProviderId,
-        },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRY }
-      );
-      res.status(200).json({ token });
+      res.status(200).json({
+        token: generateToken(customer._id),
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
-// @route   GET /customer/get
-// @desc    Get logged in customer details
+// @route   GET /customer/get/:id
 // @access  PRIVATE
 router.get(
   "/customer/get/:id",
   authMiddleware.authenticateJWT,
-  param("id").isMongoId().withMessage("Invalid customer Id"),
+  [param("id").isMongoId().withMessage("Invalid customer ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-      if (req.user.id !== id) {
-        return res
-          .status(403)
-          .json({ message: "Unauthorized to get this profile" });
-      }
 
-      let customer = await Customer.findById(id);
-      if (!customer) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      let customer = await Customer.findById(id).select("-password").lean();
+      if (!customer) return res.status(404).json({ message: "User not found" });
 
-      if (mongoose.modelNames().includes("Order")) {
-        await customer.populate("orders");
-      } else {
-        customer.orders = [];
+      if (typeof Order !== "undefined" && mongoose.models.Order) {
+        customer.orders = await Order.find({ customer: id }).lean();
       }
 
       res.status(200).json(customer);
@@ -261,200 +175,80 @@ router.get(
 );
 
 // @route   POST /customer/forgot-password
-// @desc    Initiate password recovery
 // @access  PUBLIC
 router.post(
   "/customer/forgot-password",
-  [
-    param("token").isString().withMessage("Invalid password reset token"),
-    ...emailValidation(),
-  ],
+  [customerValidation.email],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email } = req.body;
-
     try {
+      if (validateRequest(req, res)) return;
+
+      const { email } = req.body;
       const customer = await Customer.findOne({ email });
-      if (!customer) {
-        return res.status(400).json({ message: "User not found" });
+      if (!customer) return res.status(400).json({ message: "User not found" });
+
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      customer.resetPasswordToken = resetToken;
+      customer.resetPasswordExpiry =
+        Date.now() + (parseInt(PASSWORD_RESET_TOKEN_EXPIRY, 10) || 3600000);
+
+      await customer.save();
+      const resetLink = `${FRONTEND_URL}/customer/reset-password/${resetToken}`;
+
+      try {
+        await sendEmail(
+          email,
+          "Password Reset Request",
+          `<p>Click below to reset your password:</p> <a href="${resetLink}">Reset Password</a>`
+        );
+      } catch (emailError) {
+        return res.status(500).json({
+          message: "Failed to send reset email",
+          error: emailError.message,
+        });
       }
 
-      const resetToken = crypto.randomBytes(20).toString("hex");
-
-      const resetExpiryInMillis =
-        parseInt(PASSWORD_RESET_TOKEN_EXPIRY, 10) || 3600000;
-      const resetExpiry = new Date(Date.now() + resetExpiryInMillis);
-
-      customer.resetPasswordToken = resetToken;
-      customer.resetPasswordExpiry = new Date(resetExpiry);
-      await customer.save();
-
-      const resetLink = `${FRONTEND_URL}/customer/reset-password/${resetToken}`;
-      const htmlContent = `<p>You requested a password reset. Click the link below to reset your password:</p><a href="${resetLink}">Reset Password</a>`;
-
-      await sendEmail(email, "Password Reset Request", htmlContent);
-
       res
-        .status(204)
-        .json({ message: "Password reset link has been sent to your email" });
+        .status(200)
+        .json({ message: "Password reset link sent to your email" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
-// @route   POST /customer/reset-password
-// @desc    Reset password using token
+// @route   POST /customer/reset-password/:token
 // @access  PUBLIC
 router.post(
   "/customer/reset-password/:token",
-  [...passwordValidation()],
+  param("token").isString().withMessage("Invalid password reset token"),
   async (req, res) => {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
     try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      if (validateRequest(req, res)) return;
+
       const customer = await Customer.findOne({
         resetPasswordToken: token,
         resetPasswordExpiry: { $gt: Date.now() },
       });
-
       if (!customer) {
-        return res.status(400).json({ message: "Invalid or expired token" });
+        return res
+          .status(400)
+          .json({ message: "Invalid or expired reset token" });
       }
 
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      customer.passwordHash = hashedPassword;
+      customer.password = await hashPassword(password);
       customer.resetPasswordToken = undefined;
       customer.resetPasswordExpiry = undefined;
-
       await customer.save();
-      res.status(204).json({ message: "Password has been successfully reset" });
+
+      res.status(200).json({ message: "Password reset successful" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
 );
-
-/* TO BE USED IF OAUTH IS REQUIRED
-// OAuth Strategy Handler
-async function handleOAuthLogin(profile, provider, done) {
-  try {
-    let customer = await Customer.findOne({ authProviderId: profile.id });
-    if (!customer) {
-      customer = new Customer({
-        firstName: profile.name?.givenName || profile.displayName.split(" ")[0],
-        lastName:
-          profile.name?.familyName || profile.displayName.split(" ")[1] || "",
-        email: profile.emails?.[0]?.value,
-        authProvider: provider,
-        authProviderId: profile.id,
-      });
-      await customer.save();
-    }
-    done(null, customer);
-  } catch (error) {
-    done(error, null);
-  }
-}
-
-// Google Auth Strategy
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/auth/google/callback",
-    },
-    (accessToken, refreshToken, profile, done) =>
-      handleOAuthLogin(profile, AuthProviders.GOOGLE, done)
-  )
-);
-
-// Apple Auth Strategy
-passport.use(
-  new AppleStrategy(
-    {
-      clientID: process.env.APPLE_CLIENT_ID,
-      teamID: process.env.APPLE_TEAM_ID,
-      keyID: process.env.APPLE_KEY_ID,
-      privateKey: process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-      callbackURL: "/auth/apple/callback",
-    },
-    (accessToken, refreshToken, profile, done) =>
-      handleOAuthLogin(profile, AuthProviders.APPLE, done)
-  )
-);
-
-// Facebook Auth Strategy
-passport.use(
-  new FacebookStrategy(
-    {
-      clientID: process.env.FACEBOOK_CLIENT_ID,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-      callbackURL: "/auth/facebook/callback",
-      profileFields: ["id", "emails", "name"],
-    },
-    (accessToken, refreshToken, profile, done) =>
-      handleOAuthLogin(profile, AuthProviders.FACEBOOK, done)
-  )
-);
-
-// OAuth Routes (Google)
-router.get(
-  "/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-router.get(
-  "/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
-    const token = jwt.sign({ id: req.user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRY,
-    });
-    res.json({ token });
-  }
-);
-
-// OAuth Routes (Apple)
-router.get("/auth/apple", passport.authenticate("apple"));
-router.get(
-  "/auth/apple/callback",
-  passport.authenticate("apple", { failureRedirect: "/login" }),
-  (req, res) => {
-    const token = jwt.sign({ id: req.user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRY,
-    });
-    res.json({ token });
-  }
-);
-
-// OAuth Routes (Facebook)
-router.get(
-  "/auth/facebook",
-  passport.authenticate("facebook", { scope: ["email"] })
-);
-router.get(
-  "/auth/facebook/callback",
-  passport.authenticate("facebook", { failureRedirect: "/login" }),
-  (req, res) => {
-    const token = jwt.sign({ id: req.user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRY,
-    });
-    res.json({ token });
-  }
-);
-*/
 
 module.exports = router;

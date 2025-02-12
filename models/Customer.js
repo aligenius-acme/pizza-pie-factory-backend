@@ -1,43 +1,35 @@
 const mongoose = require("mongoose");
-const {
-  AuthProviders,
-  PaymentTypes,
-  AddressLabels,
-} = require("../utils/enums");
+const { PaymentTypes, AddressLabels } = require("../utils/enums");
 const { Schema } = mongoose;
 
 const CustomerSchema = new Schema(
   {
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, unique: true, required: true },
+    firstName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true },
+    email: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+    },
     phone: {
       type: String,
       unique: true,
-      required: true,
+      sparse: true,
+      trim: true,
     },
-    isGuest: { type: Boolean, default: false },
-    passwordHash: {
+    password: {
       type: String,
       required: function () {
         return !this.isGuest;
       },
     },
-    authProvider: {
-      type: String,
-      enum: Object.values(AuthProviders),
-      required: function () {
-        return !this.isGuest;
-      },
-      default: function () {
-        return this.isGuest ? AuthProviders.GUEST : undefined;
-      },
-    },
-    authProviderId: { type: String, unique: true, sparse: true },
     deliveryAddresses: [
       {
         label: { type: String, enum: Object.values(AddressLabels) },
-        address: { type: String },
+        address: { type: String, required: true },
+        deliveryInstructions: { type: String, default: "" },
         latitude: { type: Number },
         longitude: { type: Number },
         saveForFuture: { type: Boolean, default: false },
@@ -51,27 +43,39 @@ const CustomerSchema = new Schema(
       },
     ],
     loyaltyPoints: { type: Number, default: 0, min: 0 },
-    resetPasswordToken: { type: String },
-    resetPasswordExpiry: { type: Date },
+    isGuest: { type: Boolean, default: false },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpiry: { type: Date, select: false },
   },
   { timestamps: true }
 );
 
-// Set virtuals to be included when converting documents to JSON or Objects
+// Exclude password from responses
 CustomerSchema.set("toJSON", {
   virtuals: true,
   transform: function (doc, ret) {
-    delete ret.passwordHash;
+    delete ret.password;
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpiry;
     return ret;
   },
 });
-CustomerSchema.set("toObject", { virtuals: true });
 
-// Define the virtual field for orders
+CustomerSchema.set("toObject", {
+  virtuals: true,
+  transform: function (doc, ret) {
+    delete ret.password;
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpiry;
+    return ret;
+  },
+});
+
+// Define virtual field for orders
 CustomerSchema.virtual("orders", {
-  ref: "Order", // The model to use
-  localField: "_id", // Find orders where `localField`
-  foreignField: "customerId", // is equal to `foreignField`
+  ref: "Order",
+  localField: "_id",
+  foreignField: "customerId",
 });
 
 module.exports = mongoose.model("Customer", CustomerSchema);
