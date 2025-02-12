@@ -1,10 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { param } = require("express-validator");
-
 const Customer = require("../models/Customer");
 const authMiddleware = require("../middleware/auth");
 const { sendEmail } = require("../utils/email");
@@ -45,8 +43,13 @@ router.post(
       );
 
       let customer =
-        !filteredBody.isGuest && filteredBody.email
-          ? await Customer.findOne({ email: filteredBody.email }).lean()
+        !filteredBody.isGuest && (filteredBody.email || filteredBody.phone)
+          ? await Customer.findOne({
+              $or: [
+                { email: filteredBody.email },
+                { phone: filteredBody.phone },
+              ],
+            }).lean()
           : null;
 
       if (customer) {
@@ -55,7 +58,9 @@ router.post(
           await customer.save();
           return res.status(201).json({ token: generateToken(customer._id) });
         }
-        return res.status(400).json({ message: "Customer already exists" });
+        return res.status(400).json({
+          message: "Customer with this email or phone already exists",
+        });
       }
 
       if (!filteredBody.isGuest)
@@ -107,6 +112,17 @@ router.put(
         )
       );
 
+      let existingCustomer = await Customer.findOne({
+        $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
+        _id: { $ne: id },
+      }).lean();
+
+      if (existingCustomer) {
+        return res.status(400).json({
+          message: "Customer with this email or phone already exists",
+        });
+      }
+
       let customer = await Customer.findById(id).select("-password");
       if (!customer)
         return res.status(404).json({ message: "Customer not found" });
@@ -133,10 +149,13 @@ router.post(
     try {
       if (validateRequest(req, res)) return;
       const { email, password } = req.body;
+
       const customer = await Customer.findOne({ email }).lean();
       if (!customer) return res.status(400).json({ message: "User not found" });
 
-      if (!(await bcrypt.compare(password, customer.password)))
+      const isPasswordValid = await bcrypt.compare(password, customer.password);
+
+      if (!isPasswordValid)
         return res.status(400).json({ message: "Invalid credentials" });
 
       res.status(200).json({

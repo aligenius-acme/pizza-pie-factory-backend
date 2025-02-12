@@ -1,6 +1,5 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { param } = require("express-validator");
 const Employee = require("../../models/Employee");
@@ -51,11 +50,13 @@ router.post(
       }
 
       let existingEmployee = await Employee.findOne({
-        email: filteredBody.email,
+        $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
       }).lean();
 
       if (existingEmployee) {
-        return res.status(400).json({ message: "Employee already exists" });
+        return res.status(400).json({
+          message: "Employee with this email or phone already exists",
+        });
       }
 
       filteredBody.password = await hashPassword(filteredBody.password);
@@ -104,6 +105,22 @@ router.put(
         )
       );
 
+      let existingEmployee = await Employee.findOne({
+        $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
+        _id: { $ne: id },
+      }).lean();
+
+      if (existingEmployee) {
+        return res.status(400).json({
+          message: "Employee with this email or phone already exists",
+        });
+      }
+
+      const branch = await Branch.findById(filteredBody.branchId).lean();
+      if (!branch) {
+        return res.status(400).json({ message: "Invalid branch ID" });
+      }
+
       let employee = await Employee.findById(id).select("-password");
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
@@ -123,9 +140,9 @@ router.put(
   }
 );
 
-// @route   GET /admin/employee/login
+// @route   POST /admin/employee/login
 // @access  PUBLIC
-router.get(
+router.post(
   "/admin/employee/login",
   [employeeValidation.email, employeeValidation.password],
   async (req, res) => {
@@ -136,7 +153,9 @@ router.get(
       const employee = await Employee.findOne({ email }).lean();
       if (!employee) return res.status(400).json({ message: "User not found" });
 
-      if (!(await bcrypt.compare(password, employee.password)))
+      const isPasswordValid = await bcrypt.compare(password, employee.password);
+
+      if (!isPasswordValid)
         return res.status(400).json({ message: "Invalid credentials" });
 
       res.status(200).json({
