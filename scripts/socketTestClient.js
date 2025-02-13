@@ -3,17 +3,24 @@ const io = require("socket.io-client");
 // Replace with your server's URL and correct port
 const socket = io("http://localhost:5000", { transports: ["websocket"] });
 
-// Replace 'receiverEmployeeId' with the actual ID of the employee who should receive the message
-const receiverEmployeeId = "67a9f7e3a9bcafd6492b1396";
+// Replace 'receiverEmployeeId' with the actual ID of the employee who should receive messages/notifications
+const receiverEmployeeId = "67ade7ce59e3e51d199080d0";
 
 socket.on("connect", () => {
   console.log("Connected to Socket.io server, socket id:", socket.id);
+
   // Join the room for the receiver employee
   socket.emit("join", receiverEmployeeId);
 });
 
+// Listen for new messages
 socket.on("newMessage", (message) => {
-  console.log("New message received:", message);
+  console.log("📩 New Message Received:", message);
+});
+
+// Listen for new notifications
+socket.on("newNotification", (notification) => {
+  console.log("🔔 New Notification Received:", notification);
 });
 
 socket.on("connect_error", (err) => {

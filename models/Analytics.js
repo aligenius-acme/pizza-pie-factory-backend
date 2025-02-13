@@ -3,6 +3,11 @@ const { Schema } = mongoose;
 
 const AnalyticsSchema = new Schema(
   {
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      required: true,
+    },
     averagePreparationTime: { type: Number, required: true, min: 0 },
     averageDeliveryTime: { type: Number, required: true, min: 0 },
     totalOrdersToday: { type: Number, required: true, min: 0 },

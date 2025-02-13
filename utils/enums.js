@@ -16,6 +16,7 @@ const OrderTypes = Object.freeze({
 
 const OrderStatusses = Object.freeze({
   PREPARING: "Preparing",
+  PREPARING_COMPLETE: "Preparing Complete",
   OUT_FOR_DELIVERY: "Out For Delivery",
   DELIVERED: "Delivered",
   NEW_ORDER: "New Order Received",

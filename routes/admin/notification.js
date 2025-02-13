@@ -18,7 +18,6 @@ router.post(
   [...notificationValidation()],
   async (req, res) => {
     try {
-      io.emit("newNotification", "notification");
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });

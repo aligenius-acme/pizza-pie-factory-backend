@@ -41,9 +41,9 @@ router.post(
 
       // Emit the new message to the receiver's room via Socket.io
       const io = req.app.get("io");
-      io.to(filteredBody.receiverId).emit("newMessage", newMessage);
+      io.to(filteredBody.receiverId).emit("newMessage", employeeMessage);
 
-      res.status(201).json(newMessage);
+      res.status(201).json(employeeMessage);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

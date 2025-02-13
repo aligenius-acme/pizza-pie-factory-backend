@@ -138,11 +138,17 @@ router.patch(
       const { id } = req.params;
       const { status } = req.body;
 
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id,
-        { status },
-        { new: true }
-      );
+      if (status === OrderStatusses.DELIVERED) {
+        updateData.DeliveredAt = new Date();
+      }
+
+      if (status === OrderStatusses.PREPARING_COMPLETE) {
+        updateData.CompletedAt = new Date();
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
       if (!updatedOrder) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -201,6 +207,7 @@ router.get(
         order = "desc",
         customerId,
         status,
+        branchId,
       } = req.query;
 
       const pageNumber = parseInt(page, 10);
@@ -210,6 +217,7 @@ router.get(
       let filter = {};
       if (customerId) filter.customerId = customerId;
       if (status) filter.status = status;
+      if (branchId) filter.branchId = branchId;
 
       const orders = await Order.find(filter)
         .populate({ path: "customerId", select: "name email" })
