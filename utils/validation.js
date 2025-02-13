@@ -162,7 +162,7 @@ const branchValidation = {
 
 // Calegory validation logic
 const categoryValidation = () => [
-  body("name").notEmpty().withMessage("Branch name is required"),
+  body("name").notEmpty().withMessage("Menu name is required"),
 ];
 
 // Employee message validation logic
@@ -288,6 +288,7 @@ module.exports = {
   customerValidation,
   employeeValidation,
   branchValidation,
+  categoryValidation,
   // passwordValidation,
   // emailValidation,
   // phoneValidation,
@@ -295,7 +296,7 @@ module.exports = {
   // roleValidation,
   // branchValidation,
   // addressValidation,
-  categoryValidation,
+
   foodItemValidation,
   employeeMessageValidation,
   notificationValidation,

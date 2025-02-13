@@ -64,7 +64,8 @@ router.put(
 
       let filteredBody = Object.fromEntries(
         Object.entries(req.body).filter(
-          ([key, value]) => allowedFields.includes(key) && value !== undefined
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
         )
       );
 
@@ -98,9 +99,8 @@ router.get(
 
       res.status(200).json(branches);
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
+      res;
+      res.status(500).json({ error: error.message });
     }
   }
 );
