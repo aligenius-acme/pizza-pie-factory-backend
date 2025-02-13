@@ -1,34 +1,32 @@
 const express = require("express");
-const { param, validationResult } = require("express-validator");
+const { param } = require("express-validator");
 const Cart = require("../models/Cart");
 const authMiddleware = require("../middleware/auth");
-
 const { cartValidation } = require("../utils/validation");
+const { validateRequest } = require("../utils/helpers");
 
 const router = express.Router();
 
 // POST /api/cart/create
-// Create a new cart
-// Access: Authenticated / Guests users
+// Access: PUBLIC
 router.post(
   "/cart/create",
   authMiddleware.authenticateJWT,
-  ...cartValidation(),
+  [...cartValidation()],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
-      const { customerId, items, totalAmount } = req.body;
+      const allowedFields = ["customerId", "location", "items", "totalAmount"];
 
-      const cart = new Cart({
-        customerId,
-        items,
-        totalAmount,
-      });
+      const filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
+        )
+      );
 
+      const cart = new Cart(filteredBody);
       await cart.save();
       res.status(201).json(cart);
     } catch (error) {
@@ -38,33 +36,33 @@ router.post(
 );
 
 // PUT /api/cart/update/:id
-// Update an existing cart
-// Access: Authenticated users / Guests users
+// Access: PUBLIC
 router.put(
   "/cart/update/:id",
   authMiddleware.authenticateJWT,
   [param("id").isMongoId().withMessage("Invalid cart ID"), ...cartValidation()],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-      const { customerId, items, totalAmount } = req.body;
+      const allowedFields = ["customerId", "location", "items", "totalAmount"];
 
-      const updatedCart = await Cart.findByIdAndUpdate(
-        id,
-        { customerId, items, totalAmount },
-        { new: true }
+      const filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
+        )
       );
 
-      if (!updatedCart) {
+      const cart = await Cart.findById(id);
+      if (!cart) {
         return res.status(404).json({ message: "Cart not found" });
       }
 
-      res.json(updatedCart);
+      Object.assign(cart, filteredBody);
+      await cart.save();
+      res.status(200).json(cart);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -72,52 +70,21 @@ router.put(
 );
 
 // GET /api/cart/get/:id
-// Retrieve a cart by ID
-// Access: Authenticated users / Guests users
+// Access: PUBLIC
 router.get(
   "/cart/get/:id",
   authMiddleware.authenticateJWT,
   [param("id").isMongoId().withMessage("Invalid cart ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
-      const cart = await Cart.findById(req.params.id)
-        .populate("customerId")
-        .populate("items.foodItemId");
+      const cart = await Cart.findById(req.params.id).lean();
 
       if (!cart) {
         return res.status(404).json({ message: "Cart not found" });
       }
 
-      cart.items.forEach((item) => {
-        if (item.foodItemId) {
-          const baseOptions = item.foodItemId.customizationOptions || {};
-          const cartOptions = item.customizationOptions || {};
-          item.finalCustomizationOptions = { ...baseOptions, ...cartOptions };
-        }
-      });
-
-      res.json(cart);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// GET /api/carts
-// Retrieve all carts
-// Access: Authenticated users / Guest users
-router.get("/carts", authMiddleware.authenticateJWT, async (req, res) => {
-  try {
-    const carts = await Cart.find()
-      .populate("customerId")
-      .populate("items.foodItemId");
-
-    carts.forEach((cart) => {
       cart.items.forEach((item) => {
         if (item.foodItemId && item.foodItemId.customizationOptions) {
           const baseOptions = item.foodItemId.customizationOptions || {};
@@ -125,35 +92,31 @@ router.get("/carts", authMiddleware.authenticateJWT, async (req, res) => {
           item.finalCustomizationOptions = { ...baseOptions, ...cartOptions };
         }
       });
-    });
 
-    res.json(carts);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      res.status(200).json(cart);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // DELETE /api/cart/delete/:id
-// Delete a cart
-// Access: Authenticated users / Guest users
+// Access: PUBLIC
 router.delete(
   "/cart/delete/:id",
   authMiddleware.authenticateJWT,
   [param("id").isMongoId().withMessage("Invalid cart ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-      const cart = await Cart.findByIdAndDelete(id);
+      const cart = await Cart.findByIdAndDelete(id).lean();
       if (!cart) {
         return res.status(404).json({ message: "Cart not found" });
       }
 
-      res.json({ message: "Cart deleted successfully" });
+      res.status(200).json({ message: "Cart deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

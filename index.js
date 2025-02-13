@@ -39,12 +39,16 @@ app.use(cors());
 app.use(passport.initialize());
 
 // Available Routes
-app.use("/api", require("./routes/customer"));
 app.use("/api", require("./routes/admin/employee"));
+app.use("/api", require("./routes/admin/employeeMessage"));
+app.use("/api", require("./routes/admin/notification"));
 app.use("/api", require("./routes/admin/branch"));
 app.use("/api", require("./routes/admin/category"));
 app.use("/api", require("./routes/admin/foodItem"));
-app.use("/api", require("./routes/admin/employeeMessage"));
+app.use("/api", require("./routes/admin/cart"));
+app.use("/api", require("./routes/customer"));
+app.use("/api", require("./routes/cart"));
+app.use("/api", require("./routes/customer"));
 
 server.listen(port, () => {
   console.log(`Pizza Pie Factory backend app listening on port ${port}`);

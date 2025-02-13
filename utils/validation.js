@@ -191,46 +191,14 @@ const foodItemValidation = () => [
     .withMessage("Image URL must be a valid URL"),
 ];
 
-// Employee message validation logic
-const employeeMessageValidation = () => [
-  body("message").notEmpty().withMessage("Message is required"),
-  body("receiverId").isMongoId().withMessage("Invalid receiver ID"),
-];
-
-// Notification validation logic
-const notificationValidation = [
-  body("recipientType")
-    .notEmpty()
-    .withMessage("Recipient type is required")
-    .isIn(Object.values(RecipientTypes))
-    .withMessage("Invalid recipient type"),
-  body("message").notEmpty().withMessage("Message is required"),
-  body("type")
-    .notEmpty()
-    .withMessage("Notification type is required")
-    .isIn(Object.values(NotificationTypes))
-    .withMessage("Invalid notification type"),
-  body().custom((value) => {
-    if (value.recipientType === RecipientTypes.CUSTOMER && !value.recipientId) {
-      throw new Error("For Customer notifications, recipientId is required.");
-    }
-    if (value.recipientType === RecipientTypes.BRANCH && !value.branchId) {
-      throw new Error("For Branch notifications, branchId is required.");
-    }
-    return true;
-  }),
-];
-
 // Cart validation logic
-const cartValidation = [
-  // Conditionally require customerId only if the cart is not for a guest.
+const cartValidation = () => [
   body("customerId")
     .if((value, { req }) => !req.body.isGuest)
     .notEmpty()
     .withMessage("Customer ID is required")
     .isMongoId()
     .withMessage("Invalid customer ID"),
-  // Items array validation
   body("items")
     .isArray({ min: 1 })
     .withMessage("Items must be an array with at least one item"),
@@ -300,22 +268,44 @@ const orderValidation = () => [
     .withMessage("Invalid longitude"),
 ];
 
+// Employee message validation logic
+const employeeMessageValidation = () => [
+  body("message").notEmpty().withMessage("Message is required"),
+  body("receiverId").isMongoId().withMessage("Invalid receiver ID"),
+];
+
+// Notification validation logic
+const notificationValidation = () => [
+  body("recipientType")
+    .notEmpty()
+    .withMessage("Recipient type is required")
+    .isIn(Object.values(RecipientTypes))
+    .withMessage("Invalid recipient type"),
+  body("message").notEmpty().withMessage("Message is required"),
+  body("type")
+    .notEmpty()
+    .withMessage("Notification type is required")
+    .isIn(Object.values(NotificationTypes))
+    .withMessage("Invalid notification type"),
+  body().custom((value) => {
+    if (value.recipientType === RecipientTypes.CUSTOMER && !value.recipientId) {
+      throw new Error("For Customer notifications, recipientId is required.");
+    }
+    if (value.recipientType === RecipientTypes.BRANCH && !value.branchId) {
+      throw new Error("For Branch notifications, branchId is required.");
+    }
+    return true;
+  }),
+];
+
 module.exports = {
   customerValidation,
   employeeValidation,
   branchValidation,
   categoryValidation,
   foodItemValidation,
-  // passwordValidation,
-  // emailValidation,
-  // phoneValidation,
-  // nameValidation,
-  // roleValidation,
-  // branchValidation,
-  // addressValidation,
-
-  employeeMessageValidation,
-  notificationValidation,
   cartValidation,
   orderValidation,
+  employeeMessageValidation,
+  notificationValidation,
 };

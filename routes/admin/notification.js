@@ -11,14 +11,14 @@ const { sendSms } = require("../../utils/sms");
 const router = express.Router();
 
 // POST /admin/notification/create
-// Create a new notification
-// Access: Private
+// Access: PRIVATE
 router.post(
   "/admin/notification/create",
   authMiddleware.authenticateJWT,
-  ...notificationValidation(),
+  [...notificationValidation()],
   async (req, res) => {
     try {
+      io.emit("newNotification", "notification");
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -72,7 +72,7 @@ router.post(
         } else {
           io.to(recipientId.toString()).emit("newNotification", notification);
         }
-      } else if (recipientType === RecipientTypes.BRANCH) {
+      } else if (recipientType === RecipientTypes.EMPLOYEE) {
         if (branchId) {
           io.to(branchId.toString()).emit("newNotification", notification);
         } else {

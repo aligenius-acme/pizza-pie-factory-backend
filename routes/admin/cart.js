@@ -1,24 +1,47 @@
 const express = require("express");
-const { param, validationResult } = require("express-validator");
+const { param } = require("express-validator");
 const Cart = require("../../models/Cart");
 const authMiddleware = require("../../middleware/auth");
-
-const { cartValidation } = require("../../utils/validation");
+const { validateRequest } = require("../../utils/helpers");
 
 const router = express.Router();
 
-// GET /api/carts
-// Retrieve all carts
-// Access: Site admin only
+// GET /api/admin/carts
+// Access: PRIVATE (Admin Only)
 router.get(
-  "/carts",
+  "/admin/carts",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
   async (req, res) => {
     try {
-      const carts = await Cart.find()
-        .populate("customerId")
-        .populate("items.foodItemId");
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        order = "desc",
+        customer, // Optional filtering by customer ID
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      let filter = {};
+      if (customer) {
+        filter.customer = customer;
+      }
+
+      const carts = await Cart.find(filter)
+        .populate({ path: "customer", select: "name" })
+        .populate({ path: "foodItem", select: "name" })
+        .sort({ [sortBy]: sortOrder })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .lean();
+
+      if (!carts.length) {
+        return res.status(404).json({ message: "No cart(s) found" });
+      }
 
       carts.forEach((cart) => {
         cart.items.forEach((item) => {
@@ -30,16 +53,26 @@ router.get(
         });
       });
 
-      res.json(carts);
+      const totalCount = await Cart.countDocuments(filter);
+
+      res.status(200).json({
+        success: true,
+        data: carts,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 );
 
-// DELETE /api/cart/delete/:id
-// Delete a cart
-// Access: Site admin only
+// DELETE /api/admin/cart/delete/:id
+// Access: PRIVATE (Admin Only)
 router.delete(
   "/cart/delete/:id",
   authMiddleware.authenticateJWT,
@@ -47,18 +80,15 @@ router.delete(
   [param("id").isMongoId().withMessage("Invalid cart ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-      const cart = await Cart.findByIdAndDelete(id);
+      const cart = await Cart.findByIdAndDelete(id).lean();
       if (!cart) {
         return res.status(404).json({ message: "Cart not found" });
       }
 
-      res.json({ message: "Cart deleted successfully" });
+      res.status(200).json({ message: "Cart deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

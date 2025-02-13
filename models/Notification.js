@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { RecipientTypes, NotificationTypes } = require("../../utils/enums");
+const { RecipientTypes, NotificationTypes } = require("../utils/enums");
 const { Schema } = mongoose;
 
 const NotificationSchema = new Schema(
