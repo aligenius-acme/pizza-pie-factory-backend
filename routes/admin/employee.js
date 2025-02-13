@@ -40,7 +40,8 @@ router.post(
 
       let filteredBody = Object.fromEntries(
         Object.entries(req.body).filter(
-          ([key, value]) => allowedFields.includes(key) && value !== undefined
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value != null
         )
       );
 

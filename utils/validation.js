@@ -163,6 +163,32 @@ const branchValidation = {
 // Calegory validation logic
 const categoryValidation = () => [
   body("name").notEmpty().withMessage("Menu name is required"),
+  body("imageUrl")
+    .optional()
+    .isURL()
+    .withMessage("Image URL must be a valid URL"),
+];
+
+// Food item validation logic
+const foodItemValidation = () => [
+  body("name").notEmpty().withMessage("Food item name is required"),
+  body("price")
+    .notEmpty()
+    .withMessage("Price is required")
+    .isNumeric()
+    .withMessage("Price must be a number")
+    .isFloat({ min: 0 })
+    .withMessage("Price must be greater than or equal to 0"),
+  body("categories")
+    .notEmpty()
+    .withMessage("Food item should be associated with atleast one catagory"),
+  body("ingredients")
+    .notEmpty()
+    .withMessage("Food item should be associated with atleast one catagory"),
+  body("imageUrl")
+    .optional()
+    .isURL()
+    .withMessage("Image URL must be a valid URL"),
 ];
 
 // Employee message validation logic
@@ -229,16 +255,6 @@ const cartValidation = [
     .withMessage("Total amount must be non-negative"),
 ];
 
-// Food item validation logic
-const foodItemValidation = () => [
-  body("name").notEmpty().withMessage("Food item name is required"),
-  body("price")
-    .notEmpty()
-    .withMessage("Price is required")
-    .isNumeric()
-    .withMessage("Price must be a number"),
-];
-
 // Order validation logic
 const orderValidation = () => [
   body("customerId").isMongoId().withMessage("Invalid customer ID"),
@@ -289,6 +305,7 @@ module.exports = {
   employeeValidation,
   branchValidation,
   categoryValidation,
+  foodItemValidation,
   // passwordValidation,
   // emailValidation,
   // phoneValidation,
@@ -297,7 +314,6 @@ module.exports = {
   // branchValidation,
   // addressValidation,
 
-  foodItemValidation,
   employeeMessageValidation,
   notificationValidation,
   cartValidation,

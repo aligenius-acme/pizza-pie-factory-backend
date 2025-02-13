@@ -1,12 +1,15 @@
 const express = require("express");
-const { param, body, validationResult } = require("express-validator");
+const { param } = require("express-validator");
 const FoodItem = require("../../models/FoodItem");
 const Order = require("../../models/Order");
+const Category = require("../../models/Category");
+const mongoose = require("mongoose");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
 const { foodItemValidation } = require("../../utils/validation");
+const { validateRequest } = require("../../utils/helpers");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -19,30 +22,34 @@ const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
 
 // POST /admin/fooditem/register
-// Register a new food item with optional image upload
-// Access: Site admin only
+// Access: PRIVATE (Admin Only)
 router.post(
   "/admin/fooditem/register",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
   upload.single("image"),
-  ...foodItemValidation(),
+  [...foodItemValidation()],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
-      const {
-        name,
-        price,
-        ingredients,
-        nutritionalInfo,
-        customizationOptions,
-      } = req.body;
+      const allowedFields = [
+        "name",
+        "price",
+        "categories",
+        "ingredients",
+        "nutritionalInfo",
+        "customizationOptions",
+      ];
 
-      let categories = req.body.categories;
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
+        )
+      );
+
+      let categories = filteredBody.categories;
       if (typeof categories === "string") {
         try {
           categories = JSON.parse(categories);
@@ -53,7 +60,28 @@ router.post(
         }
       }
 
-      const existingFoodItem = await FoodItem.findOne({ name });
+      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+      categories = categories.map((id) => id.trim());
+
+      if (!categories.every(isValidObjectId)) {
+        return res
+          .status(400)
+          .json({ error: "Invalid category ID(s) provided" });
+      }
+
+      const existingCategories = await Category.find({
+        _id: { $in: categories },
+      }).lean();
+
+      if (existingCategories.length !== categories.length) {
+        return res
+          .status(400)
+          .json({ error: "One or more categories do not exist" });
+      }
+
+      const existingFoodItem = await FoodItem.findOne({
+        name: filteredBody.name,
+      });
       if (existingFoodItem) {
         return res
           .status(400)
@@ -61,13 +89,15 @@ router.post(
       }
 
       let foodItemData = {
-        name,
-        price,
-        categories,
-        ingredients,
-        nutritionalInfo: nutritionalInfo ? JSON.parse(nutritionalInfo) : {},
-        customizationOptions: customizationOptions
-          ? JSON.parse(customizationOptions)
+        name: filteredBody.name,
+        price: filteredBody.price,
+        categories: categories,
+        ingredients: filteredBody.ingredients,
+        nutritionalInfo: filteredBody.nutritionalInfo
+          ? JSON.parse(filteredBody.nutritionalInfo)
+          : {},
+        customizationOptions: filteredBody.customizationOptions
+          ? JSON.parse(filteredBody.customizationOptions)
           : {},
       };
 
@@ -75,7 +105,7 @@ router.post(
         const uploadStream = () =>
           new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-              { folder: "foodItems", public_id: name },
+              { folder: "foodItems", public_id: filteredBody.name },
               (error, result) => {
                 if (result) resolve(result);
                 else reject(error);
@@ -98,8 +128,7 @@ router.post(
 );
 
 // PUT /admin/fooditem/update/:id
-// Update a food item and optionally update its image
-// Access: Site admin only
+// Access: PRIVATE (Admin Only)
 router.put(
   "/admin/fooditem/update/:id",
   authMiddleware.authenticateJWT,
@@ -111,32 +140,31 @@ router.put(
   ],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
-      const {
-        name,
-        price,
-        ingredients,
-        nutritionalInfo,
-        customizationOptions,
-      } = req.body;
+      const allowedFields = [
+        "name",
+        "price",
+        "categories",
+        "ingredients",
+        "nutritionalInfo",
+        "customizationOptions",
+      ];
 
-      const foodItem = await FoodItem.findById(id);
-      if (!foodItem) {
-        return res.status(404).json({ message: "Food item not found" });
-      }
+      const filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
+        )
+      );
 
-      const oldName = foodItem.name;
-      let updateData = { name, price };
-
-      let categories = req.body.categories;
-      if (typeof categories === "string") {
+      if (
+        filteredBody.categories &&
+        typeof filteredBody.categories === "string"
+      ) {
         try {
-          categories = JSON.parse(categories);
+          filteredBody.categories = JSON.parse(filteredBody.categories);
         } catch (err) {
           return res
             .status(400)
@@ -144,12 +172,46 @@ router.put(
         }
       }
 
-      if (categories) updateData.categories = categories;
-      if (ingredients) updateData.ingredients = ingredients;
-      if (nutritionalInfo)
-        updateData.nutritionalInfo = JSON.parse(nutritionalInfo);
-      if (customizationOptions)
-        updateData.customizationOptions = JSON.parse(customizationOptions);
+      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+      if (filteredBody.categories) {
+        filteredBody.categories = filteredBody.categories.map((id) =>
+          id.trim()
+        );
+        if (!filteredBody.categories.every(isValidObjectId)) {
+          return res
+            .status(400)
+            .json({ error: "Invalid category ID(s) provided" });
+        }
+      }
+
+      const existingCategories = await Category.find({
+        _id: { $in: filteredBody.categories || [] },
+      }).lean();
+
+      if (
+        filteredBody.categories &&
+        existingCategories.length !== filteredBody.categories.length
+      ) {
+        return res
+          .status(400)
+          .json({ error: "One or more categories do not exist" });
+      }
+
+      const foodItem = await FoodItem.findById(id);
+      if (!foodItem) {
+        return res.status(404).json({ message: "Food item not found" });
+      }
+
+      const oldName = foodItem.name;
+
+      if (filteredBody.nutritionalInfo) {
+        filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
+      }
+      if (filteredBody.customizationOptions) {
+        filteredBody.customizationOptions = JSON.parse(
+          filteredBody.customizationOptions
+        );
+      }
 
       if (req.file) {
         if (foodItem.imageUrl) {
@@ -159,7 +221,7 @@ router.put(
         const uploadStream = () =>
           new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-              { folder: "foodItems", public_id: name },
+              { folder: "foodItems", public_id: filteredBody.name },
               (error, result) => {
                 if (result) resolve(result);
                 else reject(error);
@@ -169,13 +231,13 @@ router.put(
           });
 
         const result = await uploadStream();
-        updateData.imageUrl = result.secure_url;
+        filteredBody.imageUrl = result.secure_url;
       }
 
-      const updatedFoodItem = await FoodItem.findByIdAndUpdate(id, updateData, {
-        new: true,
-      });
-      res.json(updatedFoodItem);
+      Object.assign(foodItem, filteredBody);
+      await foodItem.save();
+
+      res.status(200).json(foodItem);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -183,46 +245,78 @@ router.put(
 );
 
 // GET /admin/fooditems
-// Get all food items
-// Access: Site admin only
+// Access: PRIVATE
 router.get(
   "/admin/fooditems",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
+  [authMiddleware.authenticateJWT],
   async (req, res) => {
     try {
-      const foodItems = await FoodItem.find()
-        .populate("categories")
-        .populate("orders");
-      res.json(foodItems);
+      const {
+        page = 1,
+        limit = 10,
+        categoryid,
+        sortBy = "createdAt",
+        order = "desc",
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      let filter = {};
+      if (categoryid) {
+        filter.categories = categoryid;
+      }
+
+      const foodItems = await FoodItem.find(filter)
+        .populate({ path: "categories", select: "name" })
+        .populate({ path: "orders", select: "status createdAt" })
+        .sort({ [sortBy]: sortOrder })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize)
+        .lean();
+
+      if (!foodItems.length) {
+        return res.status(404).json({ message: "No food items found" });
+      }
+
+      const totalCount = await FoodItem.countDocuments(filter);
+
+      res.status(200).json({
+        success: true,
+        data: foodItems,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 );
 
 // GET /admin/fooditem/get/:id
-// Get a food item by ID
-// Access: Site admin only
+// Access: PRIVATE
 router.get(
   "/admin/fooditem/get/:id",
   authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
   [param("id").isMongoId().withMessage("Invalid food item ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const foodItem = await FoodItem.findById(req.params.id)
-        .populate("categories")
-        .populate("orders");
+        .populate({ path: "categories", select: "name" })
+        .populate({ path: "orders", select: "status createdAt" })
+        .lean();
+
       if (!foodItem) {
         return res.status(404).json({ message: "Food item not found" });
       }
-      res.json(foodItem);
+      res.status(200).json(foodItem);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -230,8 +324,7 @@ router.get(
 );
 
 // DELETE /admin/fooditem/delete/:id
-// Delete a food item only if no orders reference it
-// Access: Site admin only
+// Access: PRIVATE (Admin Only)
 router.delete(
   "/admin/fooditem/delete/:id",
   authMiddleware.authenticateJWT,
@@ -239,21 +332,18 @@ router.delete(
   [param("id").isMongoId().withMessage("Invalid food item ID")],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (validateRequest(req, res)) return;
 
       const { id } = req.params;
 
-      const orders = await Order.find({ "items.foodItemId": id });
+      const orders = await Order.find({ "items.foodItemId": id }).lean();
       if (orders.length > 0) {
         return res.status(400).json({
           message: "Food item cannot be deleted as it is referenced in orders",
         });
       }
 
-      const foodItem = await FoodItem.findById(id);
+      const foodItem = await FoodItem.findById(id).lean();
       if (!foodItem) {
         return res.status(404).json({ message: "Food item not found" });
       }
@@ -263,7 +353,7 @@ router.delete(
       }
 
       await FoodItem.findByIdAndDelete(id);
-      res.json({ message: "Food item deleted successfully" });
+      res.status(200).json({ message: "Food item deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

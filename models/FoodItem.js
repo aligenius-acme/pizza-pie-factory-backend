@@ -5,8 +5,10 @@ const FoodItemSchema = new Schema(
   {
     name: { type: String, required: true },
     price: { type: Number, required: true },
-    categories: [{ type: Schema.Types.ObjectId, ref: "Category" }],
-    ingredients: [{ type: String }],
+    categories: [
+      { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    ],
+    ingredients: { type: String, required: true },
     nutritionalInfo: {
       type: Schema.Types.Mixed,
       default: {},
