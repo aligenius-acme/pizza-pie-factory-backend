@@ -81,7 +81,7 @@ router.post(
 
       const existingFoodItem = await FoodItem.findOne({
         name: filteredBody.name,
-      });
+      }).lean();
       if (existingFoodItem) {
         return res
           .status(400)
@@ -197,7 +197,7 @@ router.put(
           .json({ error: "One or more categories do not exist" });
       }
 
-      const foodItem = await FoodItem.findById(id);
+      const foodItem = await FoodItem.findById(id).lean();
       if (!foodItem) {
         return res.status(404).json({ message: "Food item not found" });
       }
@@ -356,6 +356,50 @@ router.delete(
       res.status(200).json({ message: "Food item deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// GET /api/order/best-selling
+// Access: PRIVATE (Admin Only)
+router.get(
+  "/admin/foodItem/best-selling",
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  async (req, res) => {
+    try {
+      const bestSellingItems = await Order.aggregate([
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.foodItemId",
+            totalQuantity: { $sum: "$items.quantity" },
+          },
+        },
+        { $sort: { totalQuantity: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "fooditems",
+            localField: "_id",
+            foreignField: "_id",
+            as: "foodItem",
+          },
+        },
+        { $unwind: "$foodItem" },
+        {
+          $project: {
+            _id: 1,
+            name: "$foodItem.name",
+            price: "$foodItem.price",
+            totalQuantity: 1,
+          },
+        },
+      ]);
+
+      res.status(200).json({ success: true, data: bestSellingItems });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 );

@@ -16,10 +16,11 @@ const OrderTypes = Object.freeze({
 
 const OrderStatusses = Object.freeze({
   PREPARING: "Preparing",
-  PREPARING_COMPLETE: "Preparing Complete",
   OUT_FOR_DELIVERY: "Out For Delivery",
   DELIVERED: "Delivered",
   NEW_ORDER: "New Order Received",
+  CANCELLED: "Cancelled",
+  NOT_DELIVERED: "Not Delivered",
 });
 
 const Roles = Object.freeze({
@@ -40,6 +41,21 @@ const NotificationTypes = Object.freeze({
   PROMOTION: "Promotion",
 });
 
+const OfferDiscountTypes = Object.freeze({
+  PERCENTAGE: "Percentage",
+  FIXED_AMOUNT: "Fixed Amount",
+});
+
+const OfferApplicableDays = Object.freeze({
+  MONDAY: "Monday",
+  TUESDAY: "Tuesday",
+  WEDNESDAY: "Wednesday",
+  THURSDAY: "Thursday",
+  FRIDAY: "Friday",
+  SATURDAY: "Saturday",
+  SUNDAY: "Sunday",
+});
+
 module.exports = {
   PaymentTypes,
   AddressLabels,
@@ -49,4 +65,6 @@ module.exports = {
   PaymentTypes,
   RecipientTypes,
   NotificationTypes,
+  OfferDiscountTypes,
+  OfferApplicableDays,
 };

@@ -298,6 +298,32 @@ const notificationValidation = () => [
   }),
 ];
 
+// Offer validation logic
+const offerValidation = () => [
+  body("title").isString().notEmpty().withMessage("Title is required"),
+  body("description").optional().isString(),
+  body("imageUrl").optional().isString(),
+  body("discountType")
+    .isString()
+    .notEmpty()
+    .withMessage("Discount type is required"),
+  body("discountValue")
+    .notEmpty()
+    .withMessage("Discount value is required")
+    .isNumeric(),
+  body("bundleItems")
+    .optional()
+    .isArray()
+    .withMessage("Bundle items must be an array"),
+  body("validFrom").isISO8601().withMessage("Valid from date is required"),
+  body("validUntil").isISO8601().withMessage("Valid until date is required"),
+  body("applicableDays").optional().isArray(),
+  body("applicableTime.start").optional().isString(),
+  body("applicableTime.end").optional().isString(),
+  body("termsAndConditions").optional().isString(),
+  body("isActive").optional().isBoolean(),
+];
+
 module.exports = {
   customerValidation,
   employeeValidation,
@@ -308,4 +334,5 @@ module.exports = {
   orderValidation,
   employeeMessageValidation,
   notificationValidation,
+  offerValidation,
 };

@@ -142,7 +142,7 @@ router.patch(
         updateData.DeliveredAt = new Date();
       }
 
-      if (status === OrderStatusses.PREPARING_COMPLETE) {
+      if (status === OrderStatusses.OUT_FOR_DELIVERY) {
         updateData.CompletedAt = new Date();
       }
 
