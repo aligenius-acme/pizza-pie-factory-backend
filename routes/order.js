@@ -24,17 +24,14 @@ router.post(
       const allowedFields = [
         "customerId",
         "branchId",
-        "items",
-        "orderType",
-        "deliveryAddress",
+        "totalAmount",
         "status",
         "paymentMethod",
-        "totalAmount",
+        "deliveryType",
+        "promoCode",
         "discount",
+        "deliveryAddress",
         "instructions",
-        "orderPlacedAt",
-        "completedAt",
-        "orderDeliveredAt",
       ];
 
       let filteredBody = Object.fromEntries(
@@ -44,10 +41,29 @@ router.post(
         )
       );
 
-      const order = new Order(filteredBody);
-      await order.save();
+      const newOrder = new Order({
+        customerId: filteredBody.customerId,
+        branchId: filteredBody.branchId,
+        items: cart.items,
+        offers: cart.offers,
+        totalAmount,
+        status: filteredBody.status,
+        paymentMethod: filteredBody.paymentMethod,
+        promoCode: filteredBody.promoCode,
+        discount: filteredBody.discount,
+        deliveryType: filteredBody.deliveryType,
+        deliveryAddress:
+          deliveryType === DeliveryTypes.DELIVERY
+            ? filteredBody.deliveryAddress
+            : null,
+        instructions: filteredBody.instructions,
+        statusHistory: [{ status: filteredBody.status, timestamp: new Date() }],
+        orderPlacedAt: new Date(),
+      });
 
-      await Cart.deleteMany({ customerId: req.body.customerId });
+      await newOrder.save();
+
+      await Cart.deleteMany({ customerId: filteredBody.customerId });
 
       await axios.post(`${BACKEND_URL}/api/notifications/send`, {
         userId: req.body.customerId,

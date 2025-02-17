@@ -1,12 +1,15 @@
 const express = require("express");
-const authMiddleware = require("../../middlewares/authMiddleware");
-const validateRequest = require("../../middlewares/validateRequest");
+const authMiddleware = require("../../middleware/auth");
+const mongoose = require("mongoose");
+const { offerValidation } = require("../../utils/validation");
+const { param } = require("express-validator");
 const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
 const Offer = require("../../models/Offer");
-const { offerValidation } = require("../../utils/helpers");
-const { OfferDiscountTypes } = require("../../utils/enums");
+const Category = require("../../models/Category");
+const Customization = require("../../models/Customization");
+const { validateRequest } = require("../../utils/helpers");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -31,18 +34,17 @@ router.post(
       if (validateRequest(req, res)) return;
 
       const allowedFields = [
-        "title",
+        "name",
         "description",
+        "categories",
+        "customizations",
+        "offerPrice",
         "imageUrl",
-        "discountType",
-        "discountValue",
-        "bundleItems",
         "validFrom",
         "validUntil",
-        "applicableDays",
-        "applicableTime",
         "termsAndConditions",
         "isActive",
+        "offerCode",
       ];
 
       let filteredBody = Object.fromEntries(
@@ -52,45 +54,65 @@ router.post(
         )
       );
 
-      if (
-        filteredBody.discountType !== OfferDiscountTypes.BUNDLE &&
-        (filteredBody.discountValue === undefined ||
-          filteredBody.discountValue === null)
-      ) {
-        return res.status(400).json({
-          message: "Discount value is required for non-bundle offers",
-        });
-      }
+      let customizations = filteredBody.customizations;
 
-      let foodItems = filteredBody.bundleItems;
-
-      if (typeof foodItems === "string") {
+      if (typeof customizations === "string") {
         try {
-          foodItems = JSON.parse(foodItems);
+          customizations = JSON.parse(customizations);
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for food items" });
+            .json({ error: "Invalid format for customizations" });
         }
       }
 
-      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-      foodItems = foodItems.map((id) => id.trim());
+      let isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+      customizations = customizations.map((id) => id.trim());
 
-      if (!foodItems.every(isValidObjectId)) {
+      if (!customizations.every(isValidObjectId)) {
         return res
           .status(400)
-          .json({ error: "Invalid food item ID(s) provided" });
+          .json({ error: "Invalid customization ID(s) provided" });
       }
 
-      const existingFoodItems = await FoodItem.find({
-        _id: { $in: foodItems },
-      }).lean();
+      let categories = filteredBody.categories;
+      if (typeof categories === "string") {
+        try {
+          categories = JSON.parse(categories);
+        } catch (err) {
+          return res
+            .status(400)
+            .json({ error: "Invalid format for categories" });
+        }
+      }
 
-      if (existingFoodItems.length !== foodItems.length) {
+      isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+      categories = categories.map((id) => id.trim());
+
+      if (!categories.every(isValidObjectId)) {
         return res
           .status(400)
-          .json({ error: "One or more food items do not exist" });
+          .json({ error: "Invalid category ID(s) provided" });
+      }
+
+      const existingCategories = await Category.find({
+        _id: { $in: categories },
+      }).lean();
+
+      if (existingCategories.length !== categories.length) {
+        return res
+          .status(400)
+          .json({ error: "One or more categories do not exist" });
+      }
+
+      const existingCustomizations = await Customization.find({
+        _id: { $in: customizations },
+      }).lean();
+
+      if (existingCustomizations.length !== customizations.length) {
+        return res
+          .status(400)
+          .json({ error: "One or more customizations do not exist" });
       }
 
       const existingOffer = await Offer.findOne({
@@ -102,7 +124,18 @@ router.post(
           .json({ message: "Offer with this name already exists" });
       }
 
-      let offerData = filteredBody;
+      let offerData = {
+        name: filteredBody.name,
+        description: filteredBody.description,
+        customizations: customizations,
+        offerPrice: filteredBody.offerPrice,
+        validFrom: filteredBody.validFrom,
+        validUntil: filteredBody.validUntil,
+        termsAndConditions: filteredBody.termsAndConditions,
+        isActive: filteredBody.isActive,
+        offerCode: filteredBody.offerCode,
+        categories: categories,
+      };
 
       if (req.file) {
         const uploadStream = () =>
@@ -136,11 +169,11 @@ router.put(
   "/admin/offer/update/:id",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
-  upload.single("image"),
   [
     param("id").isMongoId().withMessage("Invalid offer ID"),
     ...offerValidation(),
   ],
+  upload.single("image"),
   async (req, res) => {
     try {
       if (validateRequest(req, res)) return;
@@ -148,18 +181,17 @@ router.put(
       const { id } = req.params;
 
       const allowedFields = [
-        "title",
+        "name",
         "description",
+        "items",
+        "basePrice",
+        "totalPrice",
         "imageUrl",
-        "discountType",
-        "discountValue",
-        "bundleItems",
         "validFrom",
         "validUntil",
-        "applicableDays",
-        "applicableTime",
         "termsAndConditions",
         "isActive",
+        "offerCode",
       ];
 
       let filteredBody = Object.fromEntries(
@@ -169,44 +201,27 @@ router.put(
         )
       );
 
-      if (
-        filteredBody.discountType !== OfferDiscountTypes.BUNDLE &&
-        (filteredBody.discountValue === undefined ||
-          filteredBody.discountValue === null)
-      ) {
-        return res.status(400).json({
-          message: "Discount value is required for non-bundle offers",
-        });
-      }
-
-      let foodItems = filteredBody.bundleItems;
+      let foodItems = filteredBody.items;
       if (typeof foodItems === "string") {
         try {
           foodItems = JSON.parse(foodItems);
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for bundle items" });
+            .json({ error: "Invalid format for food items" });
         }
       }
 
       const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-      foodItems = foodItems.map((id) => id.trim());
+      foodItems = foodItems.map((item) => ({
+        itemId: item.itemId.trim(),
+        quantity: item.quantity || 1,
+      }));
 
-      if (!foodItems.every(isValidObjectId)) {
+      if (!foodItems.every((item) => isValidObjectId(item.itemId))) {
         return res
           .status(400)
-          .json({ error: "Invalid bundle item ID(s) provided" });
-      }
-
-      const existingFoodItems = await FoodItem.find({
-        _id: { $in: foodItems },
-      }).lean();
-
-      if (existingFoodItems.length !== foodItems.length) {
-        return res
-          .status(400)
-          .json({ error: "One or more bundle items do not exist" });
+          .json({ error: "Invalid food item ID(s) provided" });
       }
 
       const offer = await Offer.findById(id);
@@ -214,11 +229,9 @@ router.put(
         return res.status(404).json({ message: "Offer not found" });
       }
 
-      const oldName = offer.name;
-
       if (req.file) {
         if (offer.imageUrl) {
-          await cloudinary.uploader.destroy(`offers/${oldName}`);
+          await cloudinary.uploader.destroy(`offers/${offer.title}`);
         }
 
         const uploadStream = () =>
@@ -237,7 +250,7 @@ router.put(
         filteredBody.imageUrl = result.secure_url;
       }
 
-      Object.assign(offer, filteredBody);
+      Object.assign(offer, { ...filteredBody, items: foodItems });
       await offer.save();
 
       res.status(200).json(offer);

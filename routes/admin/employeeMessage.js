@@ -68,7 +68,9 @@ router.get(
           { senderId: currentUserId, receiverId: otherEmployeeId },
           { senderId: otherEmployeeId, receiverId: currentUserId },
         ],
-      }).sort({ timestamp: 1 });
+      })
+        .sort({ timestamp: 1 })
+        .lean();
 
       if (!messages.length) {
         return res.status(404).json({ message: "No messages found" });

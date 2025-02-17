@@ -3,6 +3,9 @@ const {
   RecipientTypes,
   NotificationTypes,
   AddressLabels,
+  OrderStatusses,
+  PaymentTypes,
+  DeliveryTypes,
 } = require("../utils/enums");
 const { body } = require("express-validator");
 
@@ -171,24 +174,48 @@ const categoryValidation = () => [
 
 // Food item validation logic
 const foodItemValidation = () => [
-  body("name").notEmpty().withMessage("Food item name is required"),
+  body("name")
+    .isString()
+    .notEmpty()
+    .withMessage("Name is required and must be a string."),
+
+  body("description")
+    .optional()
+    .isString()
+    .withMessage("Description must be a string."),
+
   body("price")
-    .notEmpty()
-    .withMessage("Price is required")
-    .isNumeric()
-    .withMessage("Price must be a number")
     .isFloat({ min: 0 })
-    .withMessage("Price must be greater than or equal to 0"),
+    .withMessage("Price is required and must be a non-negative number."),
+
   body("categories")
-    .notEmpty()
-    .withMessage("Food item should be associated with atleast one catagory"),
+    .isArray({ min: 1 })
+    .withMessage("Categories must be an array with at least one category ID."),
+
   body("ingredients")
+    .isString()
     .notEmpty()
-    .withMessage("Food item should be associated with atleast one catagory"),
+    .withMessage("Ingredients are required and must be a string."),
+
+  body("nutritionalInfo")
+    .optional()
+    .isObject()
+    .withMessage("Nutritional information must be an object."),
+
+  body("customizations")
+    .optional()
+    .isArray()
+    .withMessage("Customizations must be an array of ObjectIds."),
+
+  body("offers")
+    .optional()
+    .isArray()
+    .withMessage("Offers must be an array of ObjectIds."),
+
   body("imageUrl")
     .optional()
-    .isURL()
-    .withMessage("Image URL must be a valid URL"),
+    .isString()
+    .withMessage("Image URL must be a string."),
 ];
 
 // Cart validation logic
@@ -199,73 +226,111 @@ const cartValidation = () => [
     .withMessage("Customer ID is required")
     .isMongoId()
     .withMessage("Invalid customer ID"),
-  body("items")
-    .isArray({ min: 1 })
-    .withMessage("Items must be an array with at least one item"),
-  body("items.*.foodItemId")
-    .notEmpty()
-    .withMessage("Food item ID is required for each item")
+  // Validate items array
+  body("items").isArray().withMessage("Items must be an array"),
+  body("items.*.foodItem")
+    .optional()
     .isMongoId()
     .withMessage("Invalid food item ID"),
   body("items.*.quantity")
-    .notEmpty()
-    .withMessage("Quantity is required for each item")
-    .isNumeric()
-    .withMessage("Quantity must be a number")
-    .custom((value) => value >= 1)
+    .isInt({ min: 1 })
     .withMessage("Quantity must be at least 1"),
+  body("items.*.customizations").optional().isArray(),
+  body("items.*.customizations.*.customization")
+    .optional()
+    .isMongoId()
+    .withMessage("Invalid customization ID"),
+  body("items.*.customizations.*.selectedOption").optional().isString(),
+  body("items.*.customizations.*.selectedSubOption").optional().isString(),
+  body("items.*.customizations.*.additionalPrice")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Additional price must be a positive number"),
+  body("items.*.totalPrice")
+    .isFloat({ min: 0 })
+    .withMessage("Total price must be a positive number"),
   body("totalAmount")
-    .notEmpty()
-    .withMessage("Total amount is required")
-    .isNumeric()
-    .withMessage("Total amount must be a number")
-    .custom((value) => value >= 0)
-    .withMessage("Total amount must be non-negative"),
+    .isFloat({ min: 0 })
+    .withMessage("Total amount must be a positive number"),
 ];
 
 // Order validation logic
 const orderValidation = () => [
-  body("customerId").isMongoId().withMessage("Invalid customer ID"),
-  body("branchId").isMongoId().withMessage("Invalid branch ID"),
+  body("customerId")
+    .notEmpty()
+    .withMessage("Customer ID is required")
+    .custom((value) => mongoose.Types.ObjectId.isValid(value))
+    .withMessage("Invalid Customer ID"),
+
+  body("branchId")
+    .notEmpty()
+    .withMessage("Branch ID is required")
+    .custom((value) => mongoose.Types.ObjectId.isValid(value))
+    .withMessage("Invalid Branch ID"),
+
   body("items")
     .isArray({ min: 1 })
-    .withMessage("Items must be an array with at least one item"),
-  body("items.*.foodItemId").isMongoId().withMessage("Invalid food item ID"),
+    .withMessage("At least one item is required"),
+  body("items.*.foodItem")
+    .optional()
+    .custom((value) => mongoose.Types.ObjectId.isValid(value))
+    .withMessage("Invalid Food Item ID"),
   body("items.*.quantity")
     .isInt({ min: 1 })
     .withMessage("Quantity must be at least 1"),
-  body("orderType")
-    .isIn(Object.values(OrderTypes))
-    .withMessage("Invalid order type"),
+  body("items.*.totalPrice")
+    .isFloat({ min: 0 })
+    .withMessage("Total price must be at least 0"),
+
+  body("offers").optional().isArray(),
+  body("offers.*.offer")
+    .notEmpty()
+    .withMessage("Offer ID is required")
+    .custom((value) => mongoose.Types.ObjectId.isValid(value))
+    .withMessage("Invalid Offer ID"),
+  body("offers.*.items").isArray(),
+  body("offers.*.items.*.foodItem")
+    .notEmpty()
+    .withMessage("Food Item ID is required")
+    .custom((value) => mongoose.Types.ObjectId.isValid(value))
+    .withMessage("Invalid Food Item ID"),
+  body("offers.*.items.*.quantity")
+    .isInt({ min: 1 })
+    .withMessage("Quantity must be at least 1"),
+  body("offers.*.totalPrice")
+    .isFloat({ min: 0 })
+    .withMessage("Total price must be at least 0"),
+
+  body("totalAmount")
+    .isFloat({ min: 0 })
+    .withMessage("Total amount must be at least 0"),
+
   body("status")
     .isIn(Object.values(OrderStatusses))
-    .withMessage("Invalid status"),
+    .withMessage("Invalid order status"),
+
   body("paymentMethod")
     .isIn(Object.values(PaymentTypes))
     .withMessage("Invalid payment method"),
-  body("totalAmount")
-    .isFloat({ min: 0 })
-    .withMessage("Total amount must be a positive number"),
-  body("discount")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("Discount must be a positive number"),
-  body("instructions")
-    .optional()
-    .isString()
-    .withMessage("Instructions must be a string"),
+
+  body("deliveryType")
+    .isIn(Object.values(DeliveryTypes))
+    .withMessage("Invalid delivery type"),
+
   body("deliveryAddress.address")
-    .optional()
-    .isString()
-    .withMessage("Invalid address"),
+    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
+    .notEmpty()
+    .withMessage("Address is required for delivery"),
   body("deliveryAddress.latitude")
-    .optional()
+    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
     .isFloat()
-    .withMessage("Invalid latitude"),
+    .withMessage("Latitude is required for delivery"),
   body("deliveryAddress.longitude")
-    .optional()
+    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
     .isFloat()
-    .withMessage("Invalid longitude"),
+    .withMessage("Longitude is required for delivery"),
+
+  body("instructions").optional().isString(),
 ];
 
 // Employee message validation logic
@@ -300,28 +365,116 @@ const notificationValidation = () => [
 
 // Offer validation logic
 const offerValidation = () => [
-  body("title").isString().notEmpty().withMessage("Title is required"),
-  body("description").optional().isString(),
-  body("imageUrl").optional().isString(),
-  body("discountType")
+  body("name")
     .isString()
     .notEmpty()
-    .withMessage("Discount type is required"),
-  body("discountValue")
+    .withMessage("Name is required and must be a string."),
+
+  body("description")
+    .optional()
+    .isString()
+    .withMessage("Description must be a string."),
+
+  body("customizations")
+    .optional()
     .notEmpty()
-    .withMessage("Discount value is required")
-    .isNumeric(),
-  body("bundleItems")
+    .withMessage("Customizations must be an array of ObjectIds."),
+
+  body("categories")
+    .notEmpty()
+    .withMessage("Categories must be an array of ObjectIds."),
+
+  body("offerPrice")
+    .isFloat({ min: 0 })
+    .withMessage("Offer price is required and must be a non-negative number."),
+
+  body("imageUrl")
+    .optional()
+    .isString()
+    .withMessage("Image URL must be a string."),
+
+  body("validFrom")
+    .isISO8601()
+    .withMessage(
+      "Valid from date is required and must be a valid ISO 8601 date."
+    ),
+
+  body("validUntil")
+    .isISO8601()
+    .withMessage(
+      "Valid until date is required and must be a valid ISO 8601 date."
+    ),
+
+  body("termsAndConditions")
+    .optional()
+    .isString()
+    .withMessage("Terms and conditions must be a string."),
+
+  body("isActive")
+    .optional()
+    .isBoolean()
+    .withMessage("isActive must be a boolean value."),
+
+  body("offerCode")
+    .isString()
+    .notEmpty()
+    .withMessage("Offer code is required and must be a string."),
+];
+
+// Customization validation logic
+const customizationValidation = () => [
+  body("customizationName")
+    .isString()
+    .notEmpty()
+    .withMessage("Customization name is required and must be a string."),
+
+  body("customizations")
+    .isArray({ min: 1 })
+    .withMessage("Customizations must be a non-empty array."),
+
+  body("customizations.*.name")
+    .isString()
+    .notEmpty()
+    .withMessage("Each customization must have a non-empty name."),
+
+  body("customizations.*.options")
+    .isArray({ min: 1 })
+    .withMessage("Each customization must have a non-empty options array."),
+
+  body("customizations.*.options.*.name")
+    .isString()
+    .notEmpty()
+    .withMessage("Each option must have a non-empty name."),
+
+  body("customizations.*.options.*.additionalPrice")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Additional price must be a non-negative number."),
+
+  body("customizations.*.options.*.isDefault")
+    .optional()
+    .isBoolean()
+    .withMessage("isDefault must be a boolean value."),
+
+  body("customizations.*.options.*.subOptions")
     .optional()
     .isArray()
-    .withMessage("Bundle items must be an array"),
-  body("validFrom").isISO8601().withMessage("Valid from date is required"),
-  body("validUntil").isISO8601().withMessage("Valid until date is required"),
-  body("applicableDays").optional().isArray(),
-  body("applicableTime.start").optional().isString(),
-  body("applicableTime.end").optional().isString(),
-  body("termsAndConditions").optional().isString(),
-  body("isActive").optional().isBoolean(),
+    .withMessage("SubOptions must be an array."),
+
+  body("customizations.*.options.*.subOptions.*.name")
+    .isString()
+    .notEmpty()
+    .withMessage("Each sub-option must have a non-empty name."),
+
+  body("customizations.*.options.*.subOptions.*.additionalPrice")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Sub-option additional price must be a non-negative number."),
+
+  body("customizations.*.options.*.subOptions.*.isDefault")
+    .optional()
+    .isBoolean()
+    .withMessage("Sub-option isDefault must be a boolean value."),
 ];
 
 module.exports = {
@@ -335,4 +488,5 @@ module.exports = {
   employeeMessageValidation,
   notificationValidation,
   offerValidation,
+  customizationValidation,
 };

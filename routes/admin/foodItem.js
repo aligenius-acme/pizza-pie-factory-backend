@@ -35,11 +35,12 @@ router.post(
 
       const allowedFields = [
         "name",
+        "description",
         "price",
         "categories",
         "ingredients",
         "nutritionalInfo",
-        "customizationOptions",
+        "customizations",
       ];
 
       let filteredBody = Object.fromEntries(
@@ -96,8 +97,8 @@ router.post(
         nutritionalInfo: filteredBody.nutritionalInfo
           ? JSON.parse(filteredBody.nutritionalInfo)
           : {},
-        customizationOptions: filteredBody.customizationOptions
-          ? JSON.parse(filteredBody.customizationOptions)
+        customizations: filteredBody.customizations
+          ? JSON.parse(filteredBody.customizations)
           : {},
       };
 
@@ -145,11 +146,12 @@ router.put(
       const { id } = req.params;
       const allowedFields = [
         "name",
+        "description",
         "price",
         "categories",
         "ingredients",
         "nutritionalInfo",
-        "customizationOptions",
+        "customizations",
       ];
 
       const filteredBody = Object.fromEntries(
@@ -207,10 +209,8 @@ router.put(
       if (filteredBody.nutritionalInfo) {
         filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
       }
-      if (filteredBody.customizationOptions) {
-        filteredBody.customizationOptions = JSON.parse(
-          filteredBody.customizationOptions
-        );
+      if (filteredBody.customizations) {
+        filteredBody.customizations = JSON.parse(filteredBody.customizations);
       }
 
       if (req.file) {
@@ -397,9 +397,9 @@ router.get(
         },
       ]);
 
-      res.status(200).json({ success: true, data: bestSellingItems });
+      res.status(200).json(bestSellingItems);
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ error: error.message });
     }
   }
 );

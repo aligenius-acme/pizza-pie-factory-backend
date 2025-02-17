@@ -65,6 +65,8 @@ app.use("/api", require("./routes/admin/category"));
 app.use("/api", require("./routes/admin/foodItem"));
 app.use("/api", require("./routes/admin/cart"));
 app.use("/api", require("./routes/admin/analytics"));
+app.use("/api", require("./routes/admin/customization"));
+app.use("/api", require("./routes/admin/offer"));
 app.use("/api", require("./routes/customer"));
 app.use("/api", require("./routes/cart"));
 app.use("/api", require("./routes/order"));

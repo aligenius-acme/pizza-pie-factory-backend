@@ -24,17 +24,14 @@ router.post(
       const allowedFields = [
         "customerId",
         "branchId",
-        "items",
-        "orderType",
-        "deliveryAddress",
+        "totalAmount",
         "status",
         "paymentMethod",
-        "totalAmount",
+        "deliveryType",
+        "promoCode",
         "discount",
+        "deliveryAddress",
         "instructions",
-        "orderPlacedAt",
-        "completedAt",
-        "orderDeliveredAt",
       ];
 
       let filteredBody = Object.fromEntries(
@@ -44,21 +41,40 @@ router.post(
         )
       );
 
-      const order = new Order(filteredBody);
-      await order.save();
+      const newOrder = new Order({
+        customerId: filteredBody.customerId,
+        branchId: filteredBody.branchId,
+        items: cart.items,
+        offers: cart.offers,
+        totalAmount,
+        status: filteredBody.status,
+        paymentMethod: filteredBody.paymentMethod,
+        promoCode: filteredBody.promoCode,
+        discount: filteredBody.discount,
+        deliveryType: filteredBody.deliveryType,
+        deliveryAddress:
+          deliveryType === DeliveryTypes.DELIVERY
+            ? filteredBody.deliveryAddress
+            : null,
+        instructions: filteredBody.instructions,
+        statusHistory: [{ status: filteredBody.status, timestamp: new Date() }],
+        orderPlacedAt: new Date(),
+      });
 
-      await Cart.deleteMany({ customerId: req.body.customerId });
+      await newOrder.save();
+
+      await Cart.deleteMany({ customerId: filteredBody.customerId });
 
       await axios.post(`${BACKEND_URL}/api/notifications/send`, {
-        userId: req.body.customerId,
-        title: order.status,
-        message: `Your order #${order._id} has been successfully created.`,
+        userId: filteredBody.customerId,
+        title: newOrder.status,
+        message: `Your order #${newOrder._id} has been successfully created.`,
       });
 
       await axios.post(`${BACKEND_URL}/api/notifications/send`, {
-        userId: req.body.branchId,
+        userId: filteredBody.branchId,
         title: OrderStatusses.NEW_ORDER,
-        message: `A new order #${order._id} has been placed.`,
+        message: `A new order #${newOrder.order._id} has been placed.`,
       });
 
       res.status(201).json(order);
@@ -85,14 +101,16 @@ router.put(
         "customerId",
         "branchId",
         "items",
-        "orderType",
-        "deliveryAddress",
-        "status",
-        "paymentMethod",
+        "offers",
         "totalAmount",
-        "discount",
+        "status",
+        "statusHistory",
+        "paymentMethod",
+        "deliveryType",
+        "deliveryAddress",
         "instructions",
         "orderPlacedAt",
+        "estimatedDeliveryTime",
         "completedAt",
         "orderDeliveredAt",
       ];
@@ -111,8 +129,14 @@ router.put(
         return res.status(404).json({ message: "Order not found" });
       }
 
-      Object.assign(order, filteredBody);
-      await order.save();
+      if (filteredBody.status) {
+        order.statusHistory.push({
+          status: filteredBody.status,
+          timestamp: new Date(),
+        });
+      }
+
+      order = await Order.findByIdAndUpdate(id, filteredBody, { new: true });
       res.status(200).json(order);
     } catch (error) {
       res.status(500).json({ error: error.message });

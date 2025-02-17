@@ -2,6 +2,7 @@ const express = require("express");
 const { param } = require("express-validator");
 const Category = require("../models/Category");
 const FoodItem = require("../models/FoodItem");
+const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 

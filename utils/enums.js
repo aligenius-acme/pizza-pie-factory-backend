@@ -9,7 +9,7 @@ const AddressLabels = Object.freeze({
   OTHER: "Other",
 });
 
-const OrderTypes = Object.freeze({
+const DeliveryTypes = Object.freeze({
   PICKUP: "Pickup",
   DELIVERY: "Delivery",
 });
@@ -60,7 +60,7 @@ module.exports = {
   PaymentTypes,
   AddressLabels,
   Roles,
-  OrderTypes,
+  DeliveryTypes,
   OrderStatusses,
   PaymentTypes,
   RecipientTypes,

@@ -51,7 +51,7 @@ router.post(
       const io = req.app.get("io");
 
       if (recipientType === RecipientTypes.CUSTOMER) {
-        const customer = await Customer.findById(recipientId);
+        const customer = await Customer.findById(recipientId).lean();
         if (!customer) {
           return res.status(400).json({ message: "Customer not found" });
         }
@@ -99,7 +99,9 @@ router.get(
   authMiddleware.authenticateAdmin,
   async (req, res) => {
     try {
-      const notifications = await Notification.find().sort({ createdAt: -1 });
+      const notifications = await Notification.find()
+        .sort({ createdAt: -1 })
+        .lean();
       res.status(200).json(notifications);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -122,7 +124,7 @@ router.get(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const notification = await Notification.findById(req.params.id);
+      const notification = await Notification.findById(req.params.id).lean();
       if (!notification) {
         return res.status(404).json({ message: "Notification not found" });
       }
