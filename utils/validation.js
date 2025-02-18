@@ -163,7 +163,6 @@ const branchValidation = {
   ],
 };
 
-// Calegory validation logic
 const categoryValidation = () => [
   body("name").notEmpty().withMessage("Menu name is required"),
   body("imageUrl")
@@ -172,12 +171,12 @@ const categoryValidation = () => [
     .withMessage("Image URL must be a valid URL"),
 ];
 
-// Food item validation logic
 const foodItemValidation = () => [
   body("name")
     .isString()
+    .trim()
     .notEmpty()
-    .withMessage("Name is required and must be a string."),
+    .withMessage("Name is required and must be a non-empty string."),
 
   body("description")
     .optional()
@@ -189,28 +188,14 @@ const foodItemValidation = () => [
     .withMessage("Price is required and must be a non-negative number."),
 
   body("categories")
-    .isArray({ min: 1 })
-    .withMessage("Categories must be an array with at least one category ID."),
+    .notEmpty()
+    .withMessage("Categories must be an array of ObjectIds."),
 
   body("ingredients")
     .isString()
+    .trim()
     .notEmpty()
-    .withMessage("Ingredients are required and must be a string."),
-
-  body("nutritionalInfo")
-    .optional()
-    .isObject()
-    .withMessage("Nutritional information must be an object."),
-
-  body("customizations")
-    .optional()
-    .isArray()
-    .withMessage("Customizations must be an array of ObjectIds."),
-
-  body("offers")
-    .optional()
-    .isArray()
-    .withMessage("Offers must be an array of ObjectIds."),
+    .withMessage("Ingredients are required and must be a non-empty string."),
 
   body("imageUrl")
     .optional()
@@ -235,23 +220,23 @@ const cartValidation = () => [
   body("items.*.quantity")
     .isInt({ min: 1 })
     .withMessage("Quantity must be at least 1"),
-  body("items.*.customizations").optional().isArray(),
-  body("items.*.customizations.*.customization")
-    .optional()
-    .isMongoId()
-    .withMessage("Invalid customization ID"),
-  body("items.*.customizations.*.selectedOption").optional().isString(),
-  body("items.*.customizations.*.selectedSubOption").optional().isString(),
-  body("items.*.customizations.*.additionalPrice")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("Additional price must be a positive number"),
-  body("items.*.totalPrice")
-    .isFloat({ min: 0 })
-    .withMessage("Total price must be a positive number"),
-  body("totalAmount")
-    .isFloat({ min: 0 })
-    .withMessage("Total amount must be a positive number"),
+  // body("items.*.customizations").optional().isArray(),
+  // body("items.*.customizations.*.customization")
+  //   .optional()
+  //   .isMongoId()
+  //   .withMessage("Invalid customization ID"),
+  // body("items.*.customizations.*.selectedOption").optional().isString(),
+  // body("items.*.customizations.*.selectedSubOption").optional().isString(),
+  // body("items.*.customizations.*.additionalPrice")
+  //   .optional()
+  //   .isFloat({ min: 0 })
+  //   .withMessage("Additional price must be a positive number"),
+  // body("items.*.totalPrice")
+  //   .isFloat({ min: 0 })
+  //   .withMessage("Total price must be a positive number"),
+  // body("totalAmount")
+  //   .isFloat({ min: 0 })
+  //   .withMessage("Total amount must be a positive number"),
 ];
 
 // Order validation logic

@@ -47,155 +47,90 @@ router.post(
   }
 );
 
-// // @route   PUT /admin/category/update/:id
-// // @access  PRIVATE (Admin Only)
-// router.put(
-//   "/admin/category/update/:id",
-//   authMiddleware.authenticateJWT,
-//   authMiddleware.authenticateAdmin,
-//   upload.single("image"),
-//   [
-//     param("id").isMongoId().withMessage("Invalid category ID"),
-//     ...categoryValidation(),
-//   ],
-//   async (req, res) => {
-//     try {
-//       if (validateRequest(req, res)) return;
+// @route   PUT /admin/customization/:id
+// @access  PRIVATE (Admin Only)
+router.put(
+  "/admin/customization/:id",
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  [...customizationValidation()],
+  async (req, res) => {
+    try {
+      if (validateRequest(req, res)) return;
 
-//       const { id } = req.params;
-//       const allowedFields = ["name"];
+      const allowedFields = ["offerId", "customizationName", "customizations"];
 
-//       const category = await Category.findById(id);
-//       if (!category) {
-//         return res.status(404).json({ message: "Category not found" });
-//       }
+      let filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(
+          ([key, value]) =>
+            allowedFields.includes(key) && value !== undefined && value !== null
+        )
+      );
 
-//       let filteredBody = Object.fromEntries(
-//         Object.entries(req.body).filter(
-//           ([key, value]) =>
-//             allowedFields.includes(key) && value !== undefined && value !== null
-//         )
-//       );
+      const existingCustomization = await Customization.findOne({
+        name: filteredBody.customizationName,
+        _id: { $ne: req.params.id },
+      }).lean();
 
-//       const oldName = category.name;
+      if (existingCustomization) {
+        return res
+          .status(400)
+          .json({ message: "Customization with this name already exists" });
+      }
 
-//       let updateData = { name: filteredBody.name };
+      const customization = await Customization.findByIdAndUpdate(
+        req.params.id,
+        filteredBody,
+        { new: true }
+      ).lean();
 
-//       if (req.file) {
-//         if (category.imageUrl) {
-//           await cloudinary.uploader.destroy(`categories/${oldName}`);
-//         }
+      if (!customization) {
+        return res.status(404).json({ message: "Customization not found" });
+      }
 
-//         const uploadStream = () =>
-//           new Promise((resolve, reject) => {
-//             const stream = cloudinary.uploader.upload_stream(
-//               { folder: "categories", public_id: filteredBody.name },
-//               (error, result) => {
-//                 if (result) resolve(result);
-//                 else reject(error);
-//               }
-//             );
-//             streamifier.createReadStream(req.file.buffer).pipe(stream);
-//           });
+      res.status(200).json(customization);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
-//         const result = await uploadStream();
-//         updateData.imageUrl = result.secure_url;
-//       }
+// @route   GET /admin/customization/:id
+// @access  PRIVATE (Admin Only)
+router.get(
+  "/admin/customization/:id",
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  [param("id").isMongoId().withMessage("Invalid food item ID")],
+  async (req, res) => {
+    try {
+      if (validateRequest(req, res)) return;
 
-//       Object.assign(category, filteredBody);
-//       await category.save();
+      const customization = await Customization.findById(req.params.id).lean();
+      if (!customization) {
+        return res.status(404).json({ message: "Customization not found" });
+      }
+      res.status(200).json(customization);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
-//       res.status(200).json(category);
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
-
-// // @route   GET /admin/categories
-// // @access  PRIVATE
-// router.get(
-//   "/admin/categories",
-//   [authMiddleware.authenticateJWT],
-//   async (req, res) => {
-//     try {
-//       const categories = await Category.find().lean();
-
-//       if (categories.length === 0) {
-//         return res.status(404).json({ message: "No categories found" });
-//       }
-
-//       res.status(200).json(categories);
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
-
-// // @route   GET /admin/category/get/:id
-// // @access  PRIVATE
-// router.get(
-//   "/admin/category/get/:id",
-//   authMiddleware.authenticateJWT,
-//   [param("id").isMongoId().withMessage("Invalid category ID")],
-//   async (req, res) => {
-//     try {
-//       if (validateRequest(req, res)) return;
-
-//       const category = await Category.findById(req.params.id).lean();
-//       if (!category) {
-//         return res.status(404).json({ message: "Category not found" });
-//       }
-
-//       if (category.items && category.items.length > 0) {
-//         category = await Category.findById(req.params.id)
-//           .populate("items")
-//           .lean();
-//       }
-
-//       res.status(200).json(category);
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
-
-// // @route   DELETE /admin/category/delete/:id
-// // @access  PRIVATE (Admin Only)
-// router.delete(
-//   "/admin/category/delete/:id",
-//   authMiddleware.authenticateJWT,
-//   authMiddleware.authenticateAdmin,
-//   [param("id").isMongoId().withMessage("Invalid category ID")],
-//   async (req, res) => {
-//     try {
-//       if (validateRequest(req, res)) return;
-
-//       const { id } = req.params;
-
-//       const foodItems = await FoodItem.find({ categories: id }).lean();
-//       if (foodItems.length > 0) {
-//         return res.status(400).json({
-//           message: "Category cannot be deleted as it has associated food items",
-//         });
-//       }
-
-//       const category = await Category.findById(id).lean();
-//       if (!category) {
-//         return res.status(404).json({ message: "Category not found" });
-//       }
-
-//       if (category.imageUrl) {
-//         await cloudinary.uploader.destroy(`categories/${category.name}`);
-//       }
-
-//       await Category.findByIdAndDelete(id);
-
-//       res.status(200).json({ message: "Category deleted successfully" });
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   }
-// );
+// @route   GET /admin/customizations
+// @access  PRIVATE (Admin Only)
+router.get(
+  "/admin/customizations",
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  async (req, res) => {
+    try {
+      const customizations = await Customization.find().lean();
+      res.status(200).json(customizations);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 module.exports = router;

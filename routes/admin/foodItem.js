@@ -3,6 +3,7 @@ const { param } = require("express-validator");
 const FoodItem = require("../../models/FoodItem");
 const Order = require("../../models/Order");
 const Category = require("../../models/Category");
+const Customization = require("../../models/Customization");
 const mongoose = require("mongoose");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
@@ -61,7 +62,7 @@ router.post(
         }
       }
 
-      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+      let isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
       categories = categories.map((id) => id.trim());
 
       if (!categories.every(isValidObjectId)) {
@@ -78,6 +79,33 @@ router.post(
         return res
           .status(400)
           .json({ error: "One or more categories do not exist" });
+      }
+
+      let customizations = filteredBody.customizations;
+      if (typeof customizations === "string") {
+        try {
+          customizations = JSON.parse(customizations);
+        } catch (err) {
+          return res
+            .status(400)
+            .json({ error: "Invalid format for customizations" });
+        }
+      }
+
+      for (let customization of customizations) {
+        if (
+          !customization.customization ||
+          !isValidObjectId(customization.customization)
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid customization ID provided" });
+        }
+        if (typeof customization.isInOffer !== "boolean") {
+          return res
+            .status(400)
+            .json({ error: "isInOffer should be a boolean value" });
+        }
       }
 
       const existingFoodItem = await FoodItem.findOne({
@@ -209,8 +237,36 @@ router.put(
       if (filteredBody.nutritionalInfo) {
         filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
       }
+
+      let customizations = filteredBody.customizations;
+      if (typeof customizations === "string") {
+        try {
+          customizations = JSON.parse(customizations);
+        } catch (err) {
+          return res
+            .status(400)
+            .json({ error: "Invalid format for customizations" });
+        }
+      }
+
+      for (let customization of customizations) {
+        if (
+          !customization.customization ||
+          !isValidObjectId(customization.customization)
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid customization ID provided" });
+        }
+        if (typeof customization.isInOffer !== "boolean") {
+          return res
+            .status(400)
+            .json({ error: "isInOffer should be a boolean value" });
+        }
+      }
+
       if (filteredBody.customizations) {
-        filteredBody.customizations = JSON.parse(filteredBody.customizations);
+        filteredBody.customizations = JSON.parse(customizations);
       }
 
       if (req.file) {

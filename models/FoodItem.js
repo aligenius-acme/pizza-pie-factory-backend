@@ -1,6 +1,15 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
+const CustomizationSchema = new Schema({
+  customization: {
+    type: Schema.Types.ObjectId,
+    ref: "Customization",
+    required: true,
+  },
+  isInOffer: { type: Boolean, default: false }, // Flag to indicate offer status
+});
+
 const FoodItemSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -14,7 +23,7 @@ const FoodItemSchema = new Schema(
       type: Schema.Types.Mixed,
       default: {},
     },
-    customizations: [{ type: Schema.Types.ObjectId, ref: "Customization" }],
+    customizations: [CustomizationSchema],
     imageUrl: { type: String },
   },
   { timestamps: true }

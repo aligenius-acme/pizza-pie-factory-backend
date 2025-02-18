@@ -163,29 +163,27 @@ router.post(
   }
 );
 
-// PUT /admin/order/update/:id
+// PUT /admin/offer/update/:id
 // Access: PRIVATE (Admin Only)
 router.put(
   "/admin/offer/update/:id",
   authMiddleware.authenticateJWT,
   authMiddleware.authenticateAdmin,
+  upload.single("image"),
   [
-    param("id").isMongoId().withMessage("Invalid offer ID"),
+    param("id").isMongoId().withMessage("Invalid Offer ID"),
     ...offerValidation(),
   ],
-  upload.single("image"),
   async (req, res) => {
     try {
       if (validateRequest(req, res)) return;
 
-      const { id } = req.params;
-
       const allowedFields = [
         "name",
         "description",
-        "items",
-        "basePrice",
-        "totalPrice",
+        "categories",
+        "customizations",
+        "offerPrice",
         "imageUrl",
         "validFrom",
         "validUntil",
@@ -201,43 +199,83 @@ router.put(
         )
       );
 
-      let foodItems = filteredBody.items;
-      if (typeof foodItems === "string") {
+      let customizations = filteredBody.customizations;
+      if (typeof customizations === "string") {
         try {
-          foodItems = JSON.parse(foodItems);
+          customizations = JSON.parse(customizations);
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for food items" });
+            .json({ error: "Invalid format for customizations" });
         }
       }
-
-      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-      foodItems = foodItems.map((item) => ({
-        itemId: item.itemId.trim(),
-        quantity: item.quantity || 1,
-      }));
-
-      if (!foodItems.every((item) => isValidObjectId(item.itemId))) {
-        return res
-          .status(400)
-          .json({ error: "Invalid food item ID(s) provided" });
+      if (customizations) {
+        customizations = customizations.map((id) => id.trim());
+        if (
+          !customizations.every((id) => mongoose.Types.ObjectId.isValid(id))
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid customization ID(s) provided" });
+        }
+        const existingCustomizations = await Customization.find({
+          _id: { $in: customizations },
+        }).lean();
+        if (existingCustomizations.length !== customizations.length) {
+          return res
+            .status(400)
+            .json({ error: "One or more customizations do not exist" });
+        }
+        filteredBody.customizations = customizations;
       }
 
-      const offer = await Offer.findById(id);
-      if (!offer) {
-        return res.status(404).json({ message: "Offer not found" });
+      let categories = filteredBody.categories;
+      if (typeof categories === "string") {
+        try {
+          categories = JSON.parse(categories);
+        } catch (err) {
+          return res
+            .status(400)
+            .json({ error: "Invalid format for categories" });
+        }
+      }
+      if (categories) {
+        categories = categories.map((id) => id.trim());
+        if (!categories.every((id) => mongoose.Types.ObjectId.isValid(id))) {
+          return res
+            .status(400)
+            .json({ error: "Invalid category ID(s) provided" });
+        }
+        const existingCategories = await Category.find({
+          _id: { $in: categories },
+        }).lean();
+        if (existingCategories.length !== categories.length) {
+          return res
+            .status(400)
+            .json({ error: "One or more categories do not exist" });
+        }
+        filteredBody.categories = categories;
+      }
+
+      if (filteredBody.name) {
+        console.log(req.params.id);
+        const existingOffer = await Offer.findOne({
+          name: filteredBody.name,
+          _id: { $ne: req.params.id },
+        }).lean();
+
+        if (existingOffer) {
+          return res
+            .status(400)
+            .json({ message: "Offer with this name already exists" });
+        }
       }
 
       if (req.file) {
-        if (offer.imageUrl) {
-          await cloudinary.uploader.destroy(`offers/${offer.title}`);
-        }
-
         const uploadStream = () =>
           new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-              { folder: "offers", public_id: filteredBody.title },
+              { folder: "offers", public_id: filteredBody.name },
               (error, result) => {
                 if (result) resolve(result);
                 else reject(error);
@@ -250,10 +288,61 @@ router.put(
         filteredBody.imageUrl = result.secure_url;
       }
 
-      Object.assign(offer, { ...filteredBody, items: foodItems });
-      await offer.save();
+      const updatedOffer = await Offer.findByIdAndUpdate(
+        req.params.id,
+        filteredBody,
+        { new: true }
+      );
 
+      if (!updatedOffer) {
+        return res.status(404).json({ error: "Offer not found" });
+      }
+
+      res.status(200).json(updatedOffer);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// GET /admin/offer/get/:id
+// Access: PRIVATE
+router.get(
+  "/admin/offer/get/:id",
+  authMiddleware.authenticateJWT,
+  [param("id").isMongoId().withMessage("Invalid offer ID")],
+  async (req, res) => {
+    try {
+      if (validateRequest(req, res)) return;
+
+      const offer = await Offer.findById(req.params.id)
+        .populate({ path: "categories" })
+        .populate({ path: "customizations" })
+        .lean();
+
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
       res.status(200).json(offer);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// GET /admin/offers
+// Access: PRIVATE
+router.get(
+  "/admin/offers",
+  authMiddleware.authenticateJWT,
+  [param("id").isMongoId().withMessage("Invalid offer ID")],
+  async (req, res) => {
+    try {
+      const offers = await Offer.find()
+        .populate({ path: "categories" })
+        .populate({ path: "customizations" })
+        .lean();
+      res.status(200).json(offers);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

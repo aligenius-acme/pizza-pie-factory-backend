@@ -19,18 +19,28 @@ const CartSchema = new Schema(
         customizations: [
           {
             customization: {
-              type: mongoose.Schema.Types.ObjectId,
+              type: Schema.Types.ObjectId,
               ref: "Customization",
             },
-            selectedOption: { type: String },
-            selectedSubOption: { type: String },
-            additionalPrice: { type: Number, default: 0 },
+            selectedOption: {
+              _id: { type: Schema.Types.ObjectId, required: true },
+              name: { type: String, required: true },
+              additionalPrice: { type: Number, default: 0 },
+            },
+            selectedSubOptions: [
+              {
+                _id: { type: Schema.Types.ObjectId, required: true },
+                name: { type: String, required: true },
+                additionalPrice: { type: Number, default: 0 },
+              },
+            ],
           },
         ],
         itemPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
       },
     ],
+    offers: [{ type: Schema.Types.ObjectId, ref: "Offer" }],
     totalAmount: { type: Number, required: true },
   },
   { timestamps: true }
@@ -38,170 +48,41 @@ const CartSchema = new Schema(
 
 /*
 {
-  "customerId": "507f1f77bcf86cd799439000",
+  "customerId": "67accf18d3b8ec235fb83f56",
   "items": [
     {
-      "foodItem": "507f1f77bcf86cd799439000",
-      "quantity": 1,
-      "customizations": [
-        {
-          "customization": "507f1f77bcf86cd799439010",
-          "selectedOption": "Hand Tossed",
-          "selectedSubOption": "Large",
-          "additionalPrice": 2.00
-        },
-        {
-          "customization": "507f1f77bcf86cd799439010",
-          "selectedOption": "Mozzarella Cheese",
-          "selectedSubOption": "Extra",
-          "additionalPrice": 1.00
-        },
-        {
-          "customization": "507f1f77bcf86cd799439010",
-          "selectedOption": "Beef",
-          "selectedSubOption": null,
-          "additionalPrice": 0
-        },
-        {
-          "customization": "507f1f77bcf86cd799439010",
-          "selectedOption": "Oregano",
-          "selectedSubOption": null,
-          "additionalPrice": 0
-        },
-        {
-          "customization": "507f1f77bcf86cd799439010",
-          "selectedOption": "BBQ Sauce",
-          "selectedSubOption": null,
-          "additionalPrice": 0
-        }
-      ],
-      "totalPrice": 18.99
-    },
-    {
-      "foodItem": "507f1f77bcf86cd799439001",
-      "quantity": 1,
-      "customizations": [
-        {
-          "customization": "507f1f77bcf86cd799439011",
-          "selectedOption": "Spicy",
-          "selectedSubOption": null,
-          "additionalPrice": 0
-        }
-      ],
-      "totalPrice": 8.99
-    },
-    {
-      "foodItem": "507f1f77bcf86cd799439002",
-      "quantity": 1,
-      "customizations": [
-        {
-          "customization": "507f1f77bcf86cd799439012",
-          "selectedOption": "Classic",
-          "selectedSubOption": null,
-          "additionalPrice": 0
-        }
-      ],
-      "totalPrice": 5.99
-    },
-    {
-      "foodItem": "507f1f77bcf86cd799439003",
+      "foodItem": "67b440af1b1feaa341700128",
       "quantity": 2,
       "customizations": [
         {
-          "customization": "507f1f77bcf86cd799439013",
-          "selectedOption": "Coke",
-          "selectedSubOption": null,
-          "additionalPrice": 0
+          "customization": "67b368071dc2259b9c35b09f",
+          "selectedOption": {
+            "_id": "605c72ef1532071f1f1f1f3f",
+            "name": "Hand Tossed",
+            "additionalPrice": 0
+          },
+          "selectedSubOptions": [
+            {
+              "_id": "605c72ef1532071f1f1f1f5f",
+              "name": "Large (L)",
+              "additionalPrice": 2
+            }
+          ]
+        },
+        {
+          "customization": "67b368071dc2259b9c35b09f",
+          "selectedOption": {
+            "_id": "605c72ef1532071f1f1f200b",
+            "name": "BBQ Sauce",
+            "additionalPrice": 0.5
+          },
+          "selectedSubOptions": []
         }
       ],
-      "totalPrice": 7.98
+      "itemPrice": 12.99
     }
   ],
-  "offers": [
-    {
-      "offer": "507f1f77bcf86cd799439000",
-      "items": [
-        {
-          "foodItem": "507f1f77bcf86cd799439000",
-          "quantity": 1,
-          "customizations": [
-            {
-              "customization": "507f1f77bcf86cd799439010",
-              "selectedOption": "Hand Tossed",
-              "selectedSubOption": "Large",
-              "additionalPrice": 2.00
-            },
-            {
-              "customization": "507f1f77bcf86cd799439010",
-              "selectedOption": "Mozzarella Cheese",
-              "selectedSubOption": "Extra",
-              "additionalPrice": 1.00
-            },
-            {
-              "customization": "507f1f77bcf86cd799439010",
-              "selectedOption": "Beef",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            },
-            {
-              "customization": "507f1f77bcf86cd799439010",
-              "selectedOption": "Oregano",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            },
-            {
-              "customization": "507f1f77bcf86cd799439010",
-              "selectedOption": "BBQ Sauce",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            }
-          ],
-          "totalPrice": 18.99
-        },
-        {
-          "foodItem": "507f1f77bcf86cd799439001",
-          "quantity": 1,
-          "customizations": [
-            {
-              "customization": "507f1f77bcf86cd799439011",
-              "selectedOption": "Spicy",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            }
-          ],
-          "totalPrice": 8.99
-        },
-        {
-          "foodItem": "507f1f77bcf86cd799439002",
-          "quantity": 1,
-          "customizations": [
-            {
-              "customization": "507f1f77bcf86cd799439012",
-              "selectedOption": "Classic",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            }
-          ],
-          "totalPrice": 5.99
-        },
-        {
-          "foodItem": "507f1f77bcf86cd799439003",
-          "quantity": 2,
-          "customizations": [
-            {
-              "customization": "507f1f77bcf86cd799439013",
-              "selectedOption": "Coke",
-              "selectedSubOption": null,
-              "additionalPrice": 0
-            }
-          ],
-          "totalPrice": 7.98
-        }
-      ],
-      "totalPrice": 41.95
-    }
-  ],
-  "totalAmount": 41.95
+  "offers": ["67b42e38748257d60b1517d0"]
 }
 
 */
