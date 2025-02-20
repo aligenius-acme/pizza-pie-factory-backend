@@ -2,22 +2,21 @@ const express = require("express");
 const { param } = require("express-validator");
 const Cart = require("../models/Cart");
 const Offer = require("../models/Offer");
-const Customization = require("../models/Customization");
 const FoodItem = require("../models/FoodItem");
 const { cartValidation } = require("../utils/validation");
 const { validateRequest } = require("../utils/helpers");
 
 const router = express.Router();
-router.post("/cart/create", async (req, res) => {
+router.post("/cart/create", [...cartValidation()], async (req, res) => {
   try {
+    if (validateRequest(req, res)) return;
     const { customerId, items, offers } = req.body;
 
     let totalAmount = 0;
     let appliedOffers = [];
     let updatedItems = [];
-    let offerItems = new Set(); // Tracks ONLY offer-related food items
+    let offerItems = new Set();
 
-    // Calculate item totals
     for (const item of items) {
       const foodItem = await FoodItem.findById(item.foodItem);
       if (!foodItem) {
@@ -47,7 +46,6 @@ router.post("/cart/create", async (req, res) => {
       });
     }
 
-    // Check and apply offers
     let offerPriceTotal = 0;
     let additionalOfferPrice = 0;
     for (const offerId of offers) {
@@ -69,7 +67,6 @@ router.post("/cart/create", async (req, res) => {
         appliedOffers.push(offerId);
         offerPriceTotal += offer.offerPrice;
 
-        // ✅ Only add items to offerItems **if they match the offer**
         for (const item of items) {
           if (
             item.customizations.some((cust) =>
@@ -80,7 +77,6 @@ router.post("/cart/create", async (req, res) => {
           }
         }
 
-        // Add additional prices for offer items
         for (const item of updatedItems) {
           if (offerItems.has(item.foodItem)) {
             additionalOfferPrice += item.additionalPrice;
@@ -89,14 +85,12 @@ router.post("/cart/create", async (req, res) => {
       }
     }
 
-    // Add non-offer items to totalAmount
     for (const item of updatedItems) {
       if (!offerItems.has(item.foodItem)) {
         totalAmount += item.totalPrice;
       }
     }
 
-    // Add offer price total separately, including additional prices
     totalAmount += offerPriceTotal + additionalOfferPrice;
 
     const cart = new Cart({
@@ -113,6 +107,135 @@ router.post("/cart/create", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+router.put(
+  "/cart/update/:id",
+  [param("id").isMongoId().withMessage("Invalid cart ID"), ...cartValidation()],
+  async (req, res) => {
+    try {
+      const { customerId, items, offers } = req.body;
+
+      // Fetch existing cart for the customer
+      let cart = await Cart.findOne({ customerId });
+
+      if (!cart) {
+        return res.status(404).json({ message: "Cart not found" });
+      }
+
+      let totalAmount = 0;
+      let appliedOffers = [];
+      let updatedItems = [...cart.items]; // Start with existing items
+      let offerItems = new Set(); // Tracks ONLY offer-related food items
+
+      // Update or Add new items
+      for (const item of items) {
+        const foodItem = await FoodItem.findById(item.foodItem);
+        if (!foodItem) {
+          return res.status(400).json({ message: "Invalid food item" });
+        }
+
+        let itemTotal = foodItem.price * item.quantity;
+        let additionalPrice = 0;
+
+        if (item.customizations) {
+          for (const cust of item.customizations) {
+            additionalPrice +=
+              cust.selectedOption.additionalPrice * item.quantity;
+            for (const subOpt of cust.selectedSubOptions) {
+              additionalPrice += subOpt.additionalPrice * item.quantity;
+            }
+          }
+        }
+
+        itemTotal += additionalPrice;
+
+        // Check if item already exists in cart
+        const existingItemIndex = updatedItems.findIndex(
+          (cartItem) =>
+            cartItem.foodItem.toString() === item.foodItem.toString()
+        );
+
+        if (existingItemIndex !== -1) {
+          // Update existing item
+          updatedItems[existingItemIndex].quantity = item.quantity;
+          updatedItems[existingItemIndex].totalPrice = itemTotal;
+          updatedItems[existingItemIndex].additionalPrice = additionalPrice;
+        } else {
+          // Add new item
+          updatedItems.push({
+            ...item,
+            itemPrice: foodItem.price,
+            additionalPrice,
+            totalPrice: itemTotal,
+          });
+        }
+      }
+
+      // Check and apply offers
+      let offerPriceTotal = 0;
+      let additionalOfferPrice = 0;
+      for (const offerId of offers) {
+        const offer = await Offer.findById(offerId).populate("customizations");
+        if (!offer) continue;
+
+        const offerCustomizationIds = offer.customizations.map((c) =>
+          c._id.toString()
+        );
+        const cartCustomizationIds = updatedItems.flatMap((item) =>
+          item.customizations.map((c) => c.customization.toString())
+        );
+
+        const allItemsIncluded = offerCustomizationIds.every((id) =>
+          cartCustomizationIds.includes(id)
+        );
+
+        if (allItemsIncluded) {
+          appliedOffers.push(offerId);
+          offerPriceTotal += offer.offerPrice;
+
+          // ✅ Only add items to offerItems **if they match the offer**
+          for (const item of updatedItems) {
+            if (
+              item.customizations.some((cust) =>
+                offerCustomizationIds.includes(cust.customization.toString())
+              )
+            ) {
+              offerItems.add(item.foodItem);
+            }
+          }
+
+          // Add additional prices for offer items
+          for (const item of updatedItems) {
+            if (offerItems.has(item.foodItem)) {
+              additionalOfferPrice += item.additionalPrice;
+            }
+          }
+        }
+      }
+
+      // Add non-offer items to totalAmount
+      for (const item of updatedItems) {
+        if (!offerItems.has(item.foodItem)) {
+          totalAmount += item.totalPrice;
+        }
+      }
+
+      // Add offer price total separately, including additional prices
+      totalAmount += offerPriceTotal + additionalOfferPrice;
+
+      // Update cart fields
+      cart.items = updatedItems;
+      cart.offers = appliedOffers;
+      cart.totalAmount = totalAmount;
+
+      await cart.save();
+      res.status(200).json(cart);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 // // POST /api/cart/create
 // // Access: PUBLIC
