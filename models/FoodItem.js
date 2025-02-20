@@ -5,7 +5,6 @@ const CustomizationSchema = new Schema({
   customization: {
     type: Schema.Types.ObjectId,
     ref: "Customization",
-    required: true,
   },
   isInOffer: { type: Boolean, default: false }, // Flag to indicate offer status
 });
