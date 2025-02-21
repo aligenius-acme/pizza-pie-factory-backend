@@ -45,7 +45,6 @@ router.post(
         customerId: filteredBody.customerId,
         branchId: filteredBody.branchId,
         items: cart.items,
-        offers: cart.offers,
         totalAmount,
         status: filteredBody.status,
         paymentMethod: filteredBody.paymentMethod,

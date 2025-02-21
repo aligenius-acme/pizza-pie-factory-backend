@@ -38,6 +38,9 @@ const CartSchema = new Schema(
         ],
         itemPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
+        offer: {
+          offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+        },
       },
     ],
     offers: [
