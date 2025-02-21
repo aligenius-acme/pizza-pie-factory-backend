@@ -193,10 +193,12 @@ router.put(
         );
 
         if (allItemsIncluded) {
-          appliedOffers.push(offerId);
+          appliedOffers.push({
+            offerId: offerId,
+            isOfferComplete: true,
+          });
           offerPriceTotal += offer.offerPrice;
 
-          // ✅ Only add items to offerItems **if they match the offer**
           for (const item of updatedItems) {
             if (
               item.customizations.some((cust) =>
@@ -207,7 +209,6 @@ router.put(
             }
           }
 
-          // Add additional prices for offer items
           for (const item of updatedItems) {
             if (offerItems.has(item.foodItem)) {
               additionalOfferPrice += item.additionalPrice;
@@ -216,17 +217,14 @@ router.put(
         }
       }
 
-      // Add non-offer items to totalAmount
       for (const item of updatedItems) {
         if (!offerItems.has(item.foodItem)) {
           totalAmount += item.totalPrice;
         }
       }
 
-      // Add offer price total separately, including additional prices
       totalAmount += offerPriceTotal + additionalOfferPrice;
 
-      // Update cart fields
       cart.items = updatedItems;
       cart.offers = appliedOffers;
       cart.totalAmount = totalAmount;
