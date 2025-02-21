@@ -40,7 +40,12 @@ const CartSchema = new Schema(
         totalPrice: { type: Number, required: true },
       },
     ],
-    offers: [{ type: Schema.Types.ObjectId, ref: "Offer" }],
+    offers: [
+      {
+        offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+        isOfferComplete: { type: Boolean, default: false },
+      },
+    ],
     totalAmount: { type: Number, required: true },
   },
   { timestamps: true }

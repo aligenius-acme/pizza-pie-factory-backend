@@ -64,7 +64,10 @@ router.post("/cart/create", [...cartValidation()], async (req, res) => {
       );
 
       if (allItemsIncluded) {
-        appliedOffers.push(offerId);
+        appliedOffers.push({
+          offerId: offerId,
+          isOfferComplete: true,
+        });
         offerPriceTotal += offer.offerPrice;
 
         for (const item of items) {
