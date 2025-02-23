@@ -5,7 +5,7 @@ const Cart = require("../models/Cart");
 const authMiddleware = require("../middleware/auth");
 const { OrderStatusses } = require("../utils/enums");
 const { orderValidation } = require("../utils/validation");
-const { validateRequest } = require("../utils/helpers");
+const { validateRequest, isWithinDeliveryRadius } = require("../utils/helpers");
 
 const router = express.Router();
 
@@ -40,6 +40,15 @@ router.post(
             allowedFields.includes(key) && value !== undefined && value !== null
         )
       );
+
+      const branch = await Branch.findById(allowedFields.branchId);
+      if (!branch) return res.status(404).json({ message: "Branch not found" });
+
+      if (!isWithinDeliveryRadius(branch, deliveryAddress)) {
+        return res
+          .status(400)
+          .json({ message: "Delivery not available in your area" });
+      }
 
       const newOrder = new Order({
         customerId: filteredBody.customerId,

@@ -14,6 +14,7 @@ const BranchSchema = new Schema(
       required: true,
       trim: true,
     },
+    deliveryRadius: { type: Number, required: true }, // In KM
   },
   { timestamps: true }
 );

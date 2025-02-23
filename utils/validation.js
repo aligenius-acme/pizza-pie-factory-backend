@@ -9,71 +9,212 @@ const {
 } = require("../utils/enums");
 const { body } = require("express-validator");
 
+// Reusable validation messages
+// Customer-related validation messages
+const customerMessages = {
+  firstName: {
+    required: "First name is required",
+  },
+  lastName: {
+    required: "Last name is required",
+  },
+  email: {
+    invalid: "Invalid email format",
+  },
+  phone: {
+    invalid:
+      "Invalid UAE phone number format. Must start with +971 and be 12-13 digits long.",
+  },
+  password: {
+    required: "Password is required",
+    minLength: "Password must be at least 8 characters long",
+    uppercase: "Password must contain at least one uppercase letter",
+    lowercase: "Password must contain at least one lowercase letter",
+    number: "Password must contain at least one number",
+    specialChar:
+      "Password must contain at least one special character (@$!%*?&)",
+  },
+  deliveryAddress: {
+    label: {
+      required: "Address label is required",
+      invalid: `Address label must be one of: ${Object.values(
+        AddressLabels
+      ).join(", ")}`,
+    },
+    address: {
+      required: "Address is required",
+    },
+    latitude: {
+      invalid: "Latitude must be a valid number",
+    },
+    longitude: {
+      invalid: "Longitude must be a valid number",
+    },
+  },
+  paymentMethod: {
+    type: {
+      required: "Payment type is required",
+      invalid: `Payment type must be one of: ${Object.values(PaymentTypes).join(
+        ", "
+      )}`,
+    },
+    cardToken: {
+      invalid: "Stored card token must be a valid string",
+    },
+  },
+};
+
+// Branch-related validation messages
+const branchMessages = {
+  name: {
+    required: "Branch name is required",
+  },
+  location: {
+    address: {
+      required: "Address is required",
+    },
+    latitude: {
+      required: "Latitude is required",
+      invalid: "Latitude must be a valid number between -90 and 90",
+    },
+    longitude: {
+      required: "Longitude is required",
+      invalid: "Longitude must be a valid number between -180 and 180",
+    },
+  },
+  contactNumber: {
+    required: "Contact number is required",
+    invalid:
+      "Invalid UAE contact number format. Must start with +971 and be 12-13 digits long.",
+  },
+  deliveryRadius: {
+    required: "Delivery radius is required",
+    invalid: "Delivery radius must be a valid number",
+  },
+};
+
+// Validation rules for customer fields
 const customerValidation = {
   name: [
-    body("firstName").notEmpty().withMessage("First name is required"),
-    body("lastName").notEmpty().withMessage("Last name is required"),
+    body("firstName")
+      .trim()
+      .notEmpty()
+      .withMessage(customerMessages.firstName.required),
+    body("lastName")
+      .trim()
+      .notEmpty()
+      .withMessage(customerMessages.lastName.required),
   ],
+
   email: [
     body("email")
-      .if((value, { req }) => !req.body.isGuest) // Only apply if user is NOT a guest
-      .notEmpty()
-      .withMessage("Email is required")
+      .optional({ checkFalsy: true })
+      .normalizeEmail()
       .isEmail()
-      .withMessage("Invalid email format"),
+      .withMessage(customerMessages.email.invalid),
   ],
+
   phone: [
     body("phone")
-      .if((value, { req }) => !req.body.isGuest) // Only apply if user is NOT a guest
-      .notEmpty()
-      .withMessage("Phone number is required")
+      .optional({ checkFalsy: true })
+      .trim()
       .matches(/^\+971[0-9]{8,9}$/)
-      .withMessage("Invalid phone number"),
+      .withMessage(customerMessages.phone.invalid),
   ],
+
   password: [
     body("password")
-      .if((value, { req }) => !req.body.isGuest) // Only apply if user is NOT a guest
+      .if((value, { req }) => !req.body.isGuest)
       .notEmpty()
-      .withMessage("Password is required")
+      .withMessage(customerMessages.password.required)
       .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long")
+      .withMessage(customerMessages.password.minLength)
       .matches(/[A-Z]/)
-      .withMessage("Password must contain at least one uppercase letter")
+      .withMessage(customerMessages.password.uppercase)
       .matches(/[a-z]/)
-      .withMessage("Password must contain at least one lowercase letter")
+      .withMessage(customerMessages.password.lowercase)
       .matches(/[0-9]/)
-      .withMessage("Password must contain at least one number")
+      .withMessage(customerMessages.password.number)
       .matches(/[@$!%*?&]/)
-      .withMessage("Password must contain at least one special character"),
+      .withMessage(customerMessages.password.specialChar),
   ],
+
   deliveryAddresses: [
     body("deliveryAddresses.*.label")
       .notEmpty()
-      .withMessage("Address label is required")
+      .withMessage(customerMessages.deliveryAddress.label.required)
       .isIn(Object.values(AddressLabels))
-      .withMessage(
-        `Address label must be one of: ${Object.values(AddressLabels).join(
-          ", "
-        )}`
-      ),
+      .withMessage(customerMessages.deliveryAddress.label.invalid),
+
     body("deliveryAddresses.*.address")
+      .trim()
       .notEmpty()
-      .withMessage("Address is required"),
+      .withMessage(customerMessages.deliveryAddress.address.required),
+
     body("deliveryAddresses.*.latitude")
-      .isNumeric()
-      .withMessage("Latitude must be a number"),
+      .optional({ checkFalsy: true })
+      .isFloat({ min: -90, max: 90 })
+      .withMessage(customerMessages.deliveryAddress.latitude.invalid),
+
     body("deliveryAddresses.*.longitude")
-      .isNumeric()
-      .withMessage("Longitude must be a number"),
+      .optional({ checkFalsy: true })
+      .isFloat({ min: -180, max: 180 })
+      .withMessage(customerMessages.deliveryAddress.longitude.invalid),
   ],
+
+  paymentMethods: [
+    body("paymentMethods.*.paymentType")
+      .notEmpty()
+      .withMessage(customerMessages.paymentMethod.type.required)
+      .isIn(Object.values(PaymentTypes))
+      .withMessage(customerMessages.paymentMethod.type.invalid),
+
+    body("paymentMethods.*.storedCardToken")
+      .optional({ checkFalsy: true })
+      .isString()
+      .withMessage(customerMessages.paymentMethod.cardToken.invalid),
+  ],
+
   all: () => [
     ...customerValidation.name,
     ...customerValidation.email,
     ...customerValidation.phone,
     ...customerValidation.password,
     ...customerValidation.deliveryAddresses,
+    ...customerValidation.paymentMethods,
   ],
 };
+
+// Branch validation logic
+const branchValidation = () => [
+  body("name").trim().notEmpty().withMessage(branchMessages.name.required),
+  body("location.address")
+    .trim()
+    .notEmpty()
+    .withMessage(branchMessages.location.address.required),
+
+  body("location.latitude")
+    .notEmpty()
+    .withMessage(branchMessages.location.latitude.required)
+    .isFloat({ min: -90, max: 90 })
+    .withMessage(branchMessages.location.latitude.invalid),
+
+  body("location.longitude")
+    .notEmpty()
+    .withMessage(branchMessages.location.longitude.required)
+    .isFloat({ min: -180, max: 180 })
+    .withMessage(branchMessages.location.longitude.invalid),
+  body("contactNumber")
+    .trim()
+    .notEmpty()
+    .withMessage(branchMessages.contactNumber.required)
+    .matches(/^\+971[0-9]{8,9}$/)
+    .withMessage(branchMessages.contactNumber.invalid),
+  body("deliveryRadius")
+    .trim()
+    .notEmpty()
+    .withMessage(branchMessages.deliveryRadius.required),
+];
 
 const employeeValidation = {
   name: [
@@ -134,32 +275,6 @@ const employeeValidation = {
     ...employeeValidation.password,
     ...employeeValidation.role,
     ...employeeValidation.branchId,
-  ],
-};
-
-// Branch validation logic
-const branchValidation = {
-  name: [body("name").notEmpty().withMessage("Branch name is required")],
-  location: [
-    body("location.address").notEmpty().withMessage("Address is required"),
-    body("location.latitude")
-      .isNumeric()
-      .withMessage("Latitude must be a number"),
-    body("location.longitude")
-      .isNumeric()
-      .withMessage("Longitude must be a number"),
-  ],
-  contactNumber: [
-    body("contactNumber")
-      .notEmpty()
-      .withMessage("Contact number is required")
-      .matches(/^\+971[0-9]{8,9}$/)
-      .withMessage("Invalid contact number"),
-  ],
-  all: () => [
-    ...branchValidation.name,
-    ...branchValidation.location,
-    ...branchValidation.contactNumber,
   ],
 };
 
@@ -464,8 +579,8 @@ const customizationValidation = () => [
 
 module.exports = {
   customerValidation,
-  employeeValidation,
   branchValidation,
+  employeeValidation,
   categoryValidation,
   foodItemValidation,
   cartValidation,
