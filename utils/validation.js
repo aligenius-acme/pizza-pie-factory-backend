@@ -93,6 +93,68 @@ const branchMessages = {
   },
 };
 
+// Cart-related validation messages
+const cartMessages = {
+  customerId: {
+    required: "Customer ID is required",
+    invalid: "Invalid Customer ID format",
+  },
+  items: {
+    foodItem: {
+      invalid: "Invalid Food Item ID format",
+    },
+    quantity: {
+      required: "Quantity is required",
+      invalid: "Quantity must be a positive integer",
+    },
+    customizations: {
+      mustBeArray: "Customizations must be an array",
+      selectedOption: {
+        required: "Selected option is required",
+        invalid: "Selected option must be a valid object",
+        name: {
+          required: "Selected option name is required",
+          invalid: "Selected option name must be a valid string",
+        },
+        additionalPrice: {
+          invalid: "Selected option additional price must be a valid number",
+        },
+      },
+      selectedSubOptions: {
+        mustBeArray: "Selected sub-options must be an array",
+        name: {
+          required: "Selected sub-option name is required",
+          invalid: "Selected sub-option name must be a valid string",
+        },
+        additionalPrice: {
+          invalid:
+            "Selected sub-option additional price must be a valid number",
+        },
+      },
+    },
+    itemPrice: {
+      required: "Item price is required",
+      invalid: "Item price must be a valid number",
+    },
+    totalPrice: {
+      required: "Total price is required",
+      invalid: "Total price must be a valid number",
+    },
+  },
+  offers: {
+    offerId: {
+      invalid: "Invalid Offer ID format",
+    },
+    isOfferComplete: {
+      invalid: "Invalid offer complete status. Must be a boolean",
+    },
+  },
+  totalAmount: {
+    required: "Total amount is required",
+    invalid: "Total amount must be a valid number",
+  },
+};
+
 // Validation rules for customer fields
 const customerValidation = {
   name: [
@@ -216,6 +278,103 @@ const branchValidation = () => [
     .withMessage(branchMessages.deliveryRadius.required),
 ];
 
+// Cart validation logic
+const cartValidation = () => [
+  body("customerId")
+    .notEmpty()
+    .withMessage(cartMessages.customerId.required)
+    .isMongoId()
+    .withMessage(cartMessages.customerId.invalid),
+
+  body("items.*.foodItem")
+    .optional({ checkFalsy: true })
+    .isMongoId()
+    .withMessage(cartMessages.items.foodItem.invalid),
+
+  body("items.*.quantity")
+    .notEmpty()
+    .withMessage(cartMessages.items.quantity.required)
+    .isInt({ min: 1 })
+    .withMessage(cartMessages.items.quantity.invalid),
+
+  body("items.*.customizations")
+    .optional({ checkFalsy: true })
+    .isArray()
+    .withMessage(cartMessages.items.customizations.mustBeArray),
+
+  body("items.*.customizations.*.selectedOption")
+    .notEmpty()
+    .withMessage(cartMessages.items.customizations.selectedOption.required)
+    .isObject()
+    .withMessage(cartMessages.items.customizations.selectedOption.invalid),
+
+  body("items.*.customizations.*.selectedOption.name")
+    .notEmpty()
+    .withMessage(cartMessages.items.customizations.selectedOption.name.required)
+    .isString()
+    .withMessage(cartMessages.items.customizations.selectedOption.name.invalid),
+
+  body("items.*.customizations.*.selectedOption.additionalPrice")
+    .optional({ checkFalsy: true })
+    .isNumeric()
+    .withMessage(
+      cartMessages.items.customizations.selectedOption.additionalPrice.invalid
+    ),
+
+  body("items.*.customizations.*.selectedSubOptions")
+    .optional({ checkFalsy: true })
+    .isArray()
+    .withMessage(
+      cartMessages.items.customizations.selectedSubOptions.mustBeArray
+    ),
+
+  body("items.*.customizations.*.selectedSubOptions.*.name")
+    .notEmpty()
+    .withMessage(
+      cartMessages.items.customizations.selectedSubOptions.name.required
+    )
+    .isString()
+    .withMessage(
+      cartMessages.items.customizations.selectedSubOptions.name.invalid
+    ),
+
+  body("items.*.customizations.*.selectedSubOptions.*.additionalPrice")
+    .optional({ checkFalsy: true })
+    .isNumeric()
+    .withMessage(
+      cartMessages.items.customizations.selectedSubOptions.additionalPrice
+        .invalid
+    ),
+
+  body("items.*.itemPrice")
+    .notEmpty()
+    .withMessage(cartMessages.items.itemPrice.required)
+    .isNumeric()
+    .withMessage(cartMessages.items.itemPrice.invalid),
+
+  // body("items.*.totalPrice")
+  //   .notEmpty()
+  //   .withMessage(cartMessages.items.totalPrice.required)
+  //   .isNumeric()
+  //   .withMessage(cartMessages.items.totalPrice.invalid),
+
+  body("offers.*.offerId")
+    .optional({ checkFalsy: true })
+    .isMongoId()
+    .withMessage(cartMessages.offers.offerId.invalid),
+
+  body("offers.*.isOfferComplete")
+    .optional({ checkFalsy: true })
+    .isBoolean()
+    .withMessage(cartMessages.offers.isOfferComplete.invalid),
+
+  // body("totalAmount")
+  //   .notEmpty()
+  //   .withMessage(cartMessages.totalAmount.required)
+  //   .isNumeric()
+  //   .withMessage(cartMessages.totalAmount.invalid),
+];
+
 const employeeValidation = {
   name: [
     body("firstName").notEmpty().withMessage("First name is required"),
@@ -316,42 +475,6 @@ const foodItemValidation = () => [
     .optional()
     .isString()
     .withMessage("Image URL must be a string."),
-];
-
-// Cart validation logic
-const cartValidation = () => [
-  body("customerId")
-    .if((value, { req }) => !req.body.isGuest)
-    .notEmpty()
-    .withMessage("Customer ID is required")
-    .isMongoId()
-    .withMessage("Invalid customer ID"),
-  // Validate items array
-  body("items").isArray().withMessage("Items must be an array"),
-  body("items.*.foodItem")
-    .optional()
-    .isMongoId()
-    .withMessage("Invalid food item ID"),
-  body("items.*.quantity")
-    .isInt({ min: 1 })
-    .withMessage("Quantity must be at least 1"),
-  // body("items.*.customizations").optional().isArray(),
-  // body("items.*.customizations.*.customization")
-  //   .optional()
-  //   .isMongoId()
-  //   .withMessage("Invalid customization ID"),
-  // body("items.*.customizations.*.selectedOption").optional().isString(),
-  // body("items.*.customizations.*.selectedSubOption").optional().isString(),
-  // body("items.*.customizations.*.additionalPrice")
-  //   .optional()
-  //   .isFloat({ min: 0 })
-  //   .withMessage("Additional price must be a positive number"),
-  // body("items.*.totalPrice")
-  //   .isFloat({ min: 0 })
-  //   .withMessage("Total price must be a positive number"),
-  // body("totalAmount")
-  //   .isFloat({ min: 0 })
-  //   .withMessage("Total amount must be a positive number"),
 ];
 
 // Order validation logic
@@ -580,10 +703,10 @@ const customizationValidation = () => [
 module.exports = {
   customerValidation,
   branchValidation,
+  cartValidation,
   employeeValidation,
   categoryValidation,
   foodItemValidation,
-  cartValidation,
   orderValidation,
   employeeMessageValidation,
   notificationValidation,

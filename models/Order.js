@@ -30,46 +30,32 @@ const OrderSchema = new Schema(
         customizations: [
           {
             customization: {
-              type: mongoose.Schema.Types.ObjectId,
+              type: Schema.Types.ObjectId,
               ref: "Customization",
             },
-            selectedOption: { type: String },
-            selectedSubOption: { type: String },
-            additionalPrice: { type: Number, default: 0 },
-          },
-        ],
-        totalPrice: { type: Number, required: true },
-      },
-    ],
-    offers: [
-      {
-        offer: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Offer",
-          required: true,
-        },
-        items: [
-          {
-            foodItem: {
-              type: mongoose.Schema.Types.ObjectId,
-              ref: "FoodItem",
-              required: true,
+            selectedOption: {
+              name: { type: String, required: true },
+              additionalPrice: { type: Number, default: 0 },
             },
-            quantity: { type: Number, required: true },
-            customizations: [
+            selectedSubOptions: [
               {
-                customization: {
-                  type: mongoose.Schema.Types.ObjectId,
-                  ref: "Customization",
-                },
-                selectedOption: { type: String },
-                selectedSubOption: { type: String },
+                name: { type: String, required: true },
                 additionalPrice: { type: Number, default: 0 },
               },
             ],
           },
         ],
+        itemPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
+        offer: {
+          offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+        },
+      },
+    ],
+    offers: [
+      {
+        offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+        isOfferComplete: { type: Boolean, default: false },
       },
     ],
     totalAmount: { type: Number, required: true, min: 0 },

@@ -30,4 +30,12 @@ module.exports = {
   BRANCH_REGISTRATION_SUCCESS: "Branch registered successfully",
   BRANCH_UPDATE_SUCCESS: "Branch updated successfully",
   NO_BRANCHES_FOUND: "No branches found",
+
+  // Cart messages
+  // Cart messages
+  CART_CREATED_SUCCESS: "Cart created successfully",
+  CART_UPDATED_SUCCESS: "Cart updated successfully",
+  CART_NOT_FOUND: "Cart not found",
+  INVALID_CART_ID: "Invalid cart ID",
+  INVALID_FOOD_ITEM: "Invalid food item",
 };

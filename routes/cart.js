@@ -6,33 +6,42 @@ const FoodItem = require("../models/FoodItem");
 const authMiddleware = require("../middleware/auth");
 const { cartValidation } = require("../utils/validation");
 const { validateRequest } = require("../utils/helpers");
+const messages = require("../utils/messages"); // Import messages
 
 const router = express.Router();
+
+// @route   POST /cart/create
+// @desc    Create a new cart for the authenticated customer
+// @access  PRIVATE (Customer Only)
 router.post(
   "/cart/create",
-  authMiddleware.authenticateJWT,
-  [...cartValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [...cartValidation()], // Apply cart validation rules
   async (req, res) => {
     try {
+      // Validate request body
       if (validateRequest(req, res)) return;
-      const { items, offers } = req.body;
 
-      const customerId = req.user.id;
+      const { items, offers } = req.body;
+      const customerId = req.user.id; // Get customer ID from authenticated user
 
       let totalAmount = 0;
       let appliedOffers = [];
       let updatedItems = [];
       let offerItems = new Set();
 
+      // Process each item in the cart
       for (const item of items) {
         const foodItem = await FoodItem.findById(item.foodItem);
         if (!foodItem) {
-          return res.status(400).json({ message: "Invalid food item" });
+          return res.status(400).json({ message: messages.INVALID_FOOD_ITEM });
         }
 
+        // Calculate item total price
         let itemTotal = foodItem.price * item.quantity;
         let additionalPrice = 0;
 
+        // Add customization prices
         if (item.customizations) {
           for (const cust of item.customizations) {
             additionalPrice +=
@@ -45,6 +54,7 @@ router.post(
 
         itemTotal += additionalPrice;
 
+        // Add item to updatedItems array
         updatedItems.push({
           ...item,
           itemPrice: foodItem.price,
@@ -53,12 +63,14 @@ router.post(
         });
       }
 
+      // Process offers
       let offerPriceTotal = 0;
       let additionalOfferPrice = 0;
       for (const offerId of offers) {
         const offer = await Offer.findById(offerId).populate("customizations");
         if (!offer) continue;
 
+        // Check if all required customizations are present in the cart
         const offerCustomizationIds = offer.customizations.map((c) =>
           c._id.toString()
         );
@@ -71,12 +83,14 @@ router.post(
         );
 
         if (allItemsIncluded) {
+          // Apply offer
           appliedOffers.push({
             offerId: offerId,
             isOfferComplete: true,
           });
           offerPriceTotal += offer.offerPrice;
 
+          // Track items included in the offer
           for (const item of items) {
             if (
               item.customizations.some((cust) =>
@@ -87,6 +101,7 @@ router.post(
             }
           }
 
+          // Adjust prices for items included in the offer
           for (const item of updatedItems) {
             if (offerItems.has(item.foodItem)) {
               additionalOfferPrice += item.additionalPrice;
@@ -103,14 +118,17 @@ router.post(
         }
       }
 
+      // Calculate total amount for non-offer items
       for (const item of updatedItems) {
         if (!offerItems.has(item.foodItem)) {
           totalAmount += item.totalPrice;
         }
       }
 
+      // Add offer prices to the total amount
       totalAmount += offerPriceTotal + additionalOfferPrice;
 
+      // Create and save the cart
       const cart = new Cart({
         customerId,
         items: updatedItems,
@@ -119,28 +137,56 @@ router.post(
       });
 
       await cart.save();
-      res.status(201).json(cart);
+
+      // Return success response
+      res.status(201).json({
+        message: messages.CART_CREATED_SUCCESS,
+        cart,
+      });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Internal server error" });
+      // Handle unexpected errors
+      console.error("Cart creation error:", error);
+
+      // Log error in MongoDB
+      await logError(
+        "/cart/create",
+        "POST",
+        error.message,
+        error.stack,
+        req.body
+      );
+
+      res.status(500).json({
+        message: messages.INTERNAL_SERVER_ERROR,
+        error: error.message,
+      });
     }
   }
 );
 
+// @route   PUT /cart/update/:id
+// @desc    Update an existing cart for the authenticated customer
+// @access  PRIVATE (Customer Only)
 router.put(
   "/cart/update/:id",
-  authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage("Invalid cart ID"), ...cartValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [
+    param("id").isMongoId().withMessage(messages.INVALID_CART_ID), // Validate cart ID
+    ...cartValidation(), // Apply cart validation rules
+  ],
   async (req, res) => {
     try {
+      // Validate request body
+      if (validateRequest(req, res)) return;
+
+      const { id } = req.params;
       const { items, offers } = req.body;
+      const customerId = req.user.id; // Get customer ID from authenticated user
 
-      const customerId = req.user.id;
-
-      let cart = await Cart.findOne({ customerId });
-
+      // Find the cart
+      let cart = await Cart.findOne({ _id: id, customerId });
       if (!cart) {
-        return res.status(404).json({ message: "Cart not found" });
+        return res.status(404).json({ message: messages.CART_NOT_FOUND });
       }
 
       let totalAmount = 0;
@@ -148,16 +194,18 @@ router.put(
       let updatedItems = [...cart.items];
       let offerItems = new Set();
 
-      // Update or Add new items
+      // Update or add new items
       for (const item of items) {
         const foodItem = await FoodItem.findById(item.foodItem);
         if (!foodItem) {
-          return res.status(400).json({ message: "Invalid food item" });
+          return res.status(400).json({ message: messages.INVALID_FOOD_ITEM });
         }
 
+        // Calculate item total price
         let itemTotal = foodItem.price * item.quantity;
         let additionalPrice = 0;
 
+        // Add customization prices
         if (item.customizations) {
           for (const cust of item.customizations) {
             additionalPrice +=
@@ -170,7 +218,7 @@ router.put(
 
         itemTotal += additionalPrice;
 
-        // Check if item already exists in cart
+        // Check if item already exists in the cart
         const existingItemIndex = updatedItems.findIndex(
           (cartItem) =>
             cartItem.foodItem.toString() === item.foodItem.toString()
@@ -192,13 +240,14 @@ router.put(
         }
       }
 
-      // Check and apply offers
+      // Process offers
       let offerPriceTotal = 0;
       let additionalOfferPrice = 0;
       for (const offerId of offers) {
         const offer = await Offer.findById(offerId).populate("customizations");
         if (!offer) continue;
 
+        // Check if all required customizations are present in the cart
         const offerCustomizationIds = offer.customizations.map((c) =>
           c._id.toString()
         );
@@ -211,12 +260,14 @@ router.put(
         );
 
         if (allItemsIncluded) {
+          // Apply offer
           appliedOffers.push({
             offerId: offerId,
             isOfferComplete: true,
           });
           offerPriceTotal += offer.offerPrice;
 
+          // Track items included in the offer
           for (const item of updatedItems) {
             if (
               item.customizations.some((cust) =>
@@ -227,6 +278,7 @@ router.put(
             }
           }
 
+          // Adjust prices for items included in the offer
           for (const item of updatedItems) {
             if (offerItems.has(item.foodItem)) {
               additionalOfferPrice += item.additionalPrice;
@@ -243,354 +295,92 @@ router.put(
         }
       }
 
+      // Calculate total amount for non-offer items
       for (const item of updatedItems) {
         if (!offerItems.has(item.foodItem)) {
           totalAmount += item.totalPrice;
         }
       }
 
+      // Add offer prices to the total amount
       totalAmount += offerPriceTotal + additionalOfferPrice;
 
+      // Update cart fields
       cart.items = updatedItems;
       cart.offers = appliedOffers;
       cart.totalAmount = totalAmount;
 
       await cart.save();
-      res.status(200).json(cart);
+
+      // Return success response
+      res.status(200).json({
+        message: messages.CART_UPDATED_SUCCESS,
+        cart,
+      });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Internal server error" });
+      // Handle unexpected errors
+      console.error("Cart update error:", error);
+
+      // Log error in MongoDB
+      await logError(
+        `/cart/update/${param("id").isMongoId()}`,
+        "PUT",
+        error.message,
+        error.stack,
+        req.body
+      );
+
+      res.status(500).json({
+        message: messages.INTERNAL_SERVER_ERROR,
+        error: error.message,
+      });
     }
   }
 );
 
-// // POST /api/cart/create
-// // Access: PUBLIC
-// router.post("/cart/create", [...cartValidation()], async (req, res) => {
-//   try {
-//     if (validateRequest(req, res)) return;
+// @route   PUT /cart/get/:id
+// @desc    Get cart details by ID (Customer Only)
+// @access  PRIVATE (Customer Only)
+router.get(
+  "/cart/get/:id",
+  authMiddleware.authenticateJWT, // Authenticate the user
+  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate the cart ID
+  async (req, res) => {
+    try {
+      // Validate the request
+      if (validateRequest(req, res)) return;
 
-//     const { customerId, items = [], offers = [] } = req.body;
+      const { id } = req.params; // Extract the cart ID from the request parameters
+      const customerId = req.user.id; // Extract the customer ID from the authenticated user
 
-//     // Validate customerId
-//     if (!customerId) {
-//       return res.status(400).json({ error: "Customer ID is required" });
-//     }
+      // Find the cart by ID and ensure it belongs to the authenticated customer
+      const cart = await Cart.findOne({ _id: id, customerId });
 
-//     // Fetch and validate offers
-//     const validOffers = [];
-//     for (const offerId of offers) {
-//       const offer = await Offer.findById(offerId);
-//       if (offer && offer.isActive) {
-//         validOffers.push(offer);
-//       } else {
-//         return res
-//           .status(404)
-//           .json({ error: `Offer with ID ${offerId} not found or inactive` });
-//       }
-//     }
+      if (!cart) {
+        return res.status(404).json({ message: messages.CART_NOT_FOUND });
+      }
 
-//     let totalAmount = 0;
-//     const processedItems = [];
-//     const offerItemIds = new Set();
+      // Return the cart details
+      res.status(200).json(cart);
+    } catch (error) {
+      // Handle unexpected errors
+      console.error("Cart get error:", error);
 
-//     // Collect all item IDs from valid offers
-//     validOffers.forEach((offer) => {
-//       if (offer.customizations && Array.isArray(offer.customizations)) {
-//         offer.customizations.forEach((customizationId) => {
-//           // Fetch customization details
-//           const customization = Customization.findById(customizationId);
-//           if (
-//             customization &&
-//             customization.items &&
-//             Array.isArray(customization.items)
-//           ) {
-//             customization.items.forEach((item) =>
-//               offerItemIds.add(item.toString())
-//             );
-//           }
-//         });
-//       }
-//     });
+      // Log error in MongoDB
+      await logError(
+        `/cart/get/${param("id").isMongoId()}`,
+        "GET",
+        error.message,
+        error.stack,
+        req.body
+      );
 
-//     console.log(offerItemIds);
-
-//     const nonOfferItems = [];
-//     const offerItems = [];
-
-//     // Separate items into offerItems and nonOfferItems
-//     for (const item of items) {
-//       if (offerItemIds.has(item.foodItem)) {
-//         offerItems.push(item);
-//       } else {
-//         nonOfferItems.push(item);
-//       }
-//     }
-
-//     // Function to process individual items
-//     const processItem = async (item) => {
-//       const foodItem = await FoodItem.findById(item.foodItem);
-//       if (!foodItem) {
-//         throw new Error(`Food item with ID ${item.foodItem} not found`);
-//       }
-
-//       if (foodItem.price !== item.itemPrice) {
-//         throw new Error(
-//           `Price mismatch for food item ${item.foodItem}. Expected: ${foodItem.price}, Received: ${item.itemPrice}`
-//         );
-//       }
-
-//       let itemPrice = foodItem.price;
-
-//       for (const customization of item.customizations) {
-//         const selectedCustomization = await Customization.findById(
-//           customization.customization
-//         );
-//         if (!selectedCustomization) {
-//           throw new Error(
-//             `Customization with ID ${customization.customization} not found`
-//           );
-//         }
-
-//         const selectedOption = selectedCustomization.customizations
-//           .flatMap((c) => c.options)
-//           .find((option) =>
-//             option._id.equals(customization.selectedOption._id)
-//           );
-
-//         if (selectedOption) {
-//           if (
-//             selectedOption.additionalPrice !==
-//             customization.selectedOption.additionalPrice
-//           ) {
-//             throw new Error(
-//               `Additional price mismatch for option ${customization.selectedOption._id}. Expected: ${selectedOption.additionalPrice}, Received: ${customization.selectedOption.additionalPrice}`
-//             );
-//           }
-//           itemPrice += selectedOption.additionalPrice;
-
-//           for (const subOption of customization.selectedSubOptions) {
-//             const selectedSubOption = selectedOption.subOptions.find((sub) =>
-//               sub._id.equals(subOption._id)
-//             );
-//             if (selectedSubOption) {
-//               if (
-//                 selectedSubOption.additionalPrice !== subOption.additionalPrice
-//               ) {
-//                 throw new Error(
-//                   `Sub-option price mismatch for sub-option ${subOption._id}. Expected: ${selectedSubOption.additionalPrice}, Received: ${subOption.additionalPrice}`
-//                 );
-//               }
-//               itemPrice += selectedSubOption.additionalPrice;
-//             }
-//           }
-//         }
-//       }
-
-//       const totalPrice = itemPrice * item.quantity;
-//       totalAmount += totalPrice;
-
-//       processedItems.push({
-//         foodItem: item.foodItem,
-//         quantity: item.quantity,
-//         customizations: item.customizations,
-//         itemPrice,
-//         totalPrice,
-//       });
-//     };
-
-//     // Process non-offer items
-//     for (const item of nonOfferItems) {
-//       await processItem(item);
-//     }
-
-//     // Process offer items
-//     for (const offer of validOffers) {
-//       if (!offer.categories || !Array.isArray(offer.categories)) {
-//         return res.status(400).json({
-//           error: `Offer with ID ${offer._id} has invalid or missing categories.`,
-//         });
-//       }
-
-//       // Get category IDs from the offer
-//       const offerCategoryIds = offer.categories.map((category) =>
-//         category.toString()
-//       );
-
-//       // Find items that belong to these categories
-//       const itemsInOffer = offerItems.filter(
-//         (item) => offerCategoryIds.includes(item.category.toString()) // Ensure item has category field
-//       );
-
-//       if (itemsInOffer.length === offerCategoryIds.length) {
-//         // All required category items are present → Apply offer price
-//         let offerTotalPrice = offer.offerPrice;
-
-//         // Process each item for customizations and validation
-//         for (const item of itemsInOffer) {
-//           await processItem(item);
-//         }
-
-//         totalAmount += offerTotalPrice;
-//       } else {
-//         // Not all required category items are present → Calculate based on individual item prices
-//         for (const item of itemsInOffer) {
-//           await processItem(item);
-//         }
-//       }
-//     }
-
-//     // Create cart entry
-//     const cart = new Cart({
-//       customerId,
-//       items: processedItems,
-//       totalAmount,
-//     });
-
-//     await cart.save();
-
-//     res.status(201).json({ message: "Cart created successfully", cart });
-//   } catch (error) {
-//     console.error("Error creating cart:", error);
-//     res.status(500).json({ error: "Failed to create cart" });
-//   }
-// });
-
-// // PUT /api/cart/update/:id
-// // Access: PUBLIC
-// router.put(
-//   "/cart/update/:id",
-//   [
-//     param("id").isMongoId().withMessage("Invalid branch ID"),
-//     ...cartValidation(),
-//   ],
-//   async (req, res) => {
-//     try {
-//       if (validateRequest(req, res)) return;
-
-//       const { id } = req.params;
-//       const { customerId, items, offers } = req.body;
-
-//       const cart = await Cart.findById(id);
-//       if (!cart) {
-//         return res.status(404).json({ error: `Cart with ID ${id} not found` });
-//       }
-
-//       const validOffers = [];
-//       if (offers && offers.length > 0) {
-//         for (const offerId of offers) {
-//           const offer = await Offer.findById(offerId);
-//           if (offer && offer.isActive) {
-//             validOffers.push(offer);
-//           } else {
-//             return res.status(404).json({
-//               error: `Offer with ID ${offerId} not found or inactive`,
-//             });
-//           }
-//         }
-//       }
-
-//       let totalAmount = 0;
-//       const processedItems = [];
-
-//       for (const item of items) {
-//         const foodItem = await FoodItem.findById(item.foodItem);
-//         if (!foodItem) {
-//           return res
-//             .status(404)
-//             .json({ error: `Food item with ID ${item.foodItem} not found` });
-//         }
-
-//         if (foodItem.price !== item.itemPrice) {
-//           return res.status(400).json({
-//             error: `Price mismatch for food item ${item.foodItem}. Expected: ${foodItem.price}, Received: ${item.itemPrice}`,
-//           });
-//         }
-
-//         let itemPrice = foodItem.price;
-
-//         for (const customization of item.customizations) {
-//           const selectedCustomization = await Customization.findById(
-//             customization.customization
-//           );
-//           if (!selectedCustomization) {
-//             return res.status(404).json({
-//               error: `Customization with ID ${customization.customization} not found`,
-//             });
-//           }
-
-//           const selectedOption = selectedCustomization.customizations
-//             .flatMap((c) => c.options)
-//             .find((option) =>
-//               option._id.equals(customization.selectedOption._id)
-//             );
-
-//           if (selectedOption) {
-//             if (
-//               selectedOption.additionalPrice !==
-//               customization.selectedOption.additionalPrice
-//             ) {
-//               return res.status(400).json({
-//                 error: `Additional price mismatch for option ${customization.selectedOption._id}. Expected: ${selectedOption.additionalPrice}, Received: ${customization.selectedOption.additionalPrice}`,
-//               });
-//             }
-//             itemPrice += selectedOption.additionalPrice;
-
-//             for (const subOption of customization.selectedSubOptions) {
-//               const selectedSubOption = selectedOption.subOptions.find((sub) =>
-//                 sub._id.equals(subOption._id)
-//               );
-//               if (selectedSubOption) {
-//                 if (
-//                   selectedSubOption.additionalPrice !==
-//                   subOption.additionalPrice
-//                 ) {
-//                   return res.status(400).json({
-//                     error: `Sub-option price mismatch for sub-option ${subOption._id}. Expected: ${selectedSubOption.additionalPrice}, Received: ${subOption.additionalPrice}`,
-//                   });
-//                 }
-//                 itemPrice += selectedSubOption.additionalPrice;
-//               }
-//             }
-//           }
-//         }
-
-//         const totalPrice = itemPrice * item.quantity;
-//         totalAmount += totalPrice;
-
-//         processedItems.push({
-//           foodItem: item.foodItem,
-//           quantity: item.quantity,
-//           customizations: item.customizations,
-//           itemPrice,
-//           totalPrice,
-//         });
-//       }
-
-//       for (const offer of validOffers) {
-//         totalAmount -= offer.offerPrice;
-//       }
-
-//       totalAmount = Math.max(totalAmount, 0);
-
-//       cart.customerId = customerId;
-//       cart.items = processedItems;
-//       cart.offers = validOffers.map((offer) => offer._id);
-//       cart.totalAmount = totalAmount;
-
-//       await cart.save();
-
-//       res.status(200).json({
-//         customerId,
-//         items: processedItems,
-//         offers: validOffers.map((offer) => offer._id),
-//         totalAmount,
-//       });
-//     } catch (error) {
-//       console.error("Error updating cart:", error);
-//       res.status(500).json({ error: "Failed to update cart" });
-//     }
-//   }
-// );
+      res.status(500).json({
+        message: messages.INTERNAL_SERVER_ERROR,
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

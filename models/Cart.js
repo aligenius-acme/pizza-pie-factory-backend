@@ -23,13 +23,11 @@ const CartSchema = new Schema(
               ref: "Customization",
             },
             selectedOption: {
-              _id: { type: Schema.Types.ObjectId, required: true },
               name: { type: String, required: true },
               additionalPrice: { type: Number, default: 0 },
             },
             selectedSubOptions: [
               {
-                _id: { type: Schema.Types.ObjectId, required: true },
                 name: { type: String, required: true },
                 additionalPrice: { type: Number, default: 0 },
               },

@@ -15,6 +15,7 @@ const BranchSchema = new Schema(
       trim: true,
     },
     deliveryRadius: { type: Number, required: true }, // In KM
+    isActive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

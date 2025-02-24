@@ -28,6 +28,7 @@ router.post(
         "location",
         "contactNumber",
         "deliveryRadius",
+        "isActive",
       ];
 
       // Filter request body to only include allowed fields
@@ -101,6 +102,7 @@ router.put(
         "location",
         "contactNumber",
         "deliveryRadius",
+        "isActive",
       ];
 
       // Filter request body to only include allowed fields
