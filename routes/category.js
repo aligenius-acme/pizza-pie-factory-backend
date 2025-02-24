@@ -3,91 +3,82 @@ const { param } = require("express-validator");
 const Category = require("../models/Category");
 const FoodItem = require("../models/FoodItem");
 const authMiddleware = require("../middleware/auth");
+const { validateRequest } = require("../utils/helpers");
+const messages = require("../utils/messages");
 
 const router = express.Router();
 
 // @route   GET /categories
-// @access  PRIVATE
-router.get(
-  "/admin/categories",
-  [authMiddleware.authenticateJWT],
-  async (req, res) => {
-    try {
-      const categories = await Category.find().lean();
+// @desc    Get all categories
+// @access  PUBLIC
+router.get("/categories", async (req, res) => {
+  try {
+    // Fetch all categories
+    const categories = await Category.find().lean();
 
-      if (categories.length === 0) {
-        return res.status(404).json({ message: "No categories found" });
-      }
-
-      res.status(200).json(categories);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    if (categories.length === 0) {
+      return res.status(404).json({ message: messages.NO_CATEGORIES_FOUND });
     }
-  }
-);
 
-// @route   GET /admin/category/get/:id
-// @access  PRIVATE
+    // Return success response
+    res.status(200).json(categories);
+  } catch (error) {
+    // Handle unexpected errors
+    console.error("Get categories error:", error);
+
+    // Log error in MongoDB
+    await logError("/categories", "GET", error.message, error.stack, req.body);
+
+    res.status(500).json({
+      message: messages.INTERNAL_SERVER_ERROR,
+      error: error.message,
+    });
+  }
+});
+
+// @route   GET /category/get/:id
+// @desc    Get category details by ID
+// @access  PRIVATE (Authenticated Users Only)
 router.get(
-  "/admin/category/get/:id",
-  authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage("Invalid category ID")],
+  "/category/get/:id",
+  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate category ID
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
-
-      const category = await Category.findById(req.params.id).lean();
-      if (!category) {
-        return res.status(404).json({ message: "Category not found" });
-      }
-
-      if (category.items && category.items.length > 0) {
-        category = await Category.findById(req.params.id)
-          .populate("items")
-          .lean();
-      }
-
-      res.status(200).json(category);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// @route   DELETE /admin/category/delete/:id
-// @access  PRIVATE (Admin Only)
-router.delete(
-  "/admin/category/delete/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [param("id").isMongoId().withMessage("Invalid category ID")],
-  async (req, res) => {
-    try {
+      // Validate request parameters
       if (validateRequest(req, res)) return;
 
       const { id } = req.params;
 
-      const foodItems = await FoodItem.find({ categories: id }).lean();
-      if (foodItems.length > 0) {
-        return res.status(400).json({
-          message: "Category cannot be deleted as it has associated food items",
-        });
-      }
-
-      const category = await Category.findById(id);
+      // Find the category by ID
+      let category = await Category.findById(id).lean();
       if (!category) {
-        return res.status(404).json({ message: "Category not found" });
+        return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
       }
 
-      if (category.imageUrl) {
-        await cloudinary.uploader.destroy(`categories/${category.name}`);
+      // Populate items if they exist
+      if (category.items && category.items.length > 0) {
+        category = await Category.findById(id).populate("items").lean();
       }
 
-      await Category.findByIdAndDelete(id);
-
-      res.status(200).json({ message: "Category deleted successfully" });
+      // Return success response
+      res.status(200).json(category);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      // Handle unexpected errors
+      console.error("Category get error:", error);
+
+      // Log error in MongoDB
+      await logError(
+        `/category/get/${param("id").isMongoId()}`,
+        "GET",
+        error.message,
+        error.stack,
+        req.body
+      );
+
+      res.status(500).json({
+        message: messages.INTERNAL_SERVER_ERROR,
+        error: error.message,
+      });
     }
   }
 );

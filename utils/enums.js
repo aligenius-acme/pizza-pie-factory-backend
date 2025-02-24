@@ -32,7 +32,8 @@ const Roles = Object.freeze({
 
 const RecipientTypes = Object.freeze({
   CUSTOMER: "Customer",
-  EMPLOYEE: "Employee",
+  // EMPLOYEE: "Employee",
+  BRANCH: "Branch",
 });
 
 const NotificationTypes = Object.freeze({

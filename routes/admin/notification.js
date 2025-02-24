@@ -1,6 +1,7 @@
 const express = require("express");
 const { param, validationResult } = require("express-validator");
 const Notification = require("../../models/Notification");
+const Customer = require("../../models/Customer");
 const authMiddleware = require("../../middleware/auth");
 const { RecipientTypes, NotificationTypes } = require("../../utils/enums");
 const { notificationValidation } = require("../../utils/validation");
@@ -39,9 +40,7 @@ router.post(
         relatedOrderId,
       };
 
-      if (recipientType === RecipientTypes.CUSTOMER) {
-        notificationData.recipientId = recipientId;
-      } else if (recipientType === RecipientTypes.BRANCH) {
+      if (recipientType === RecipientTypes.BRANCH) {
         notificationData.branchId = branchId;
       }
 

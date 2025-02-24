@@ -155,6 +155,120 @@ const cartMessages = {
   },
 };
 
+// Order-related validation messages
+const orderMessages = {
+  customerId: {
+    required: "Customer ID is required",
+    invalid: "Invalid customer ID",
+  },
+  branchId: {
+    required: "Branch ID is required",
+    invalid: "Invalid branch ID",
+  },
+  items: {
+    foodItem: {
+      invalid: "Invalid food item ID",
+    },
+    quantity: {
+      required: "Quantity is required",
+      invalid: "Quantity must be a positive integer",
+    },
+    customizations: {
+      invalid: "Customizations must be an array",
+    },
+    selectedOption: {
+      required: "Selected option is required",
+      invalid: "Selected option must be an object",
+    },
+    selectedOptionName: {
+      required: "Selected option name is required",
+      invalid: "Selected option name must be a string",
+    },
+    selectedOptionPrice: {
+      invalid: "Selected option price must be a number",
+    },
+    selectedSubOptions: {
+      invalid: "Selected sub-options must be an array",
+    },
+    selectedSubOptionName: {
+      required: "Selected sub-option name is required",
+      invalid: "Selected sub-option name must be a string",
+    },
+    selectedSubOptionPrice: {
+      invalid: "Selected sub-option price must be a number",
+    },
+    itemPrice: {
+      required: "Item price is required",
+      invalid: "Item price must be a number",
+    },
+    totalPrice: {
+      required: "Total price is required",
+      invalid: "Total price must be a number",
+    },
+  },
+  offers: {
+    offerId: {
+      invalid: "Invalid offer ID",
+    },
+    isOfferComplete: {
+      invalid: "Offer completion status must be a boolean",
+    },
+  },
+  totalAmount: {
+    required: "Total amount is required",
+    invalid: "Total amount must be a number",
+    nonNegative: "Total amount must be non-negative",
+  },
+  status: {
+    required: "Order status is required",
+    invalid: `Order status must be one of: ${Object.values(OrderStatusses).join(
+      ", "
+    )}`,
+  },
+  paymentMethod: {
+    required: "Payment method is required",
+    invalid: `Payment method must be one of: ${Object.values(PaymentTypes).join(
+      ", "
+    )}`,
+  },
+  deliveryType: {
+    required: "Delivery type is required",
+    invalid: `Delivery type must be one of: ${Object.values(DeliveryTypes).join(
+      ", "
+    )}`,
+  },
+  deliveryAddress: {
+    address: {
+      required: "Delivery address is required",
+      invalid: "Delivery address must be a string",
+    },
+    latitude: {
+      required: "Delivery latitude is required",
+      invalid: "Delivery latitude must be a number",
+    },
+    longitude: {
+      required: "Delivery longitude is required",
+      invalid: "Delivery longitude must be a number",
+    },
+  },
+  instructions: {
+    invalid: "Instructions must be a string",
+  },
+  estimatedDeliveryTime: {
+    invalid: "Invalid estimated delivery time format",
+  },
+};
+
+// Category-related validation messages
+const categoryMessages = {
+  name: {
+    required: "Category name is required",
+  },
+  imageUrl: {
+    required: "Category image is required",
+  },
+};
+
 // Validation rules for customer fields
 const customerValidation = {
   name: [
@@ -375,6 +489,152 @@ const cartValidation = () => [
   //   .withMessage(cartMessages.totalAmount.invalid),
 ];
 
+// Order validation logic
+const orderValidation = () => [
+  body("customerId")
+    .notEmpty()
+    .withMessage(orderMessages.customerId.required)
+    .isMongoId()
+    .withMessage(orderMessages.customerId.invalid),
+
+  body("branchId")
+    .notEmpty()
+    .withMessage(orderMessages.branchId.required)
+    .isMongoId()
+    .withMessage(orderMessages.branchId.invalid),
+
+  body("items.*.foodItem")
+    .optional({ checkFalsy: true })
+    .isMongoId()
+    .withMessage(orderMessages.items.foodItem.invalid),
+
+  body("items.*.quantity")
+    .notEmpty()
+    .withMessage(orderMessages.items.quantity.required)
+    .isInt({ min: 1 })
+    .withMessage(orderMessages.items.quantity.invalid),
+
+  body("items.*.customizations")
+    .optional({ checkFalsy: true })
+    .isArray()
+    .withMessage(orderMessages.items.customizations.invalid),
+
+  body("items.*.customizations.*.selectedOption")
+    .notEmpty()
+    .withMessage(orderMessages.items.selectedOption.required)
+    .isObject()
+    .withMessage(orderMessages.items.selectedOption.invalid),
+
+  body("items.*.customizations.*.selectedOption.name")
+    .notEmpty()
+    .withMessage(orderMessages.items.selectedOptionName.required)
+    .isString()
+    .withMessage(orderMessages.items.selectedOptionName.invalid),
+
+  body("items.*.customizations.*.selectedOption.additionalPrice")
+    .optional({ checkFalsy: true })
+    .isNumeric()
+    .withMessage(orderMessages.items.selectedOptionPrice.invalid),
+
+  body("items.*.customizations.*.selectedSubOptions")
+    .optional({ checkFalsy: true })
+    .isArray()
+    .withMessage(orderMessages.items.selectedSubOptions.invalid),
+
+  body("items.*.customizations.*.selectedSubOptions.*.name")
+    .notEmpty()
+    .withMessage(orderMessages.items.selectedSubOptionName.required)
+    .isString()
+    .withMessage(orderMessages.items.selectedSubOptionName.invalid),
+
+  body("items.*.customizations.*.selectedSubOptions.*.additionalPrice")
+    .optional({ checkFalsy: true })
+    .isNumeric()
+    .withMessage(orderMessages.items.selectedSubOptionPrice.invalid),
+
+  // body("items.*.itemPrice")
+  //   .notEmpty()
+  //   .withMessage(orderMessages.items.itemPrice.required)
+  //   .isNumeric()
+  //   .withMessage(orderMessages.items.itemPrice.invalid),
+
+  // body("items.*.totalPrice")
+  //   .notEmpty()
+  //   .withMessage(orderMessages.items.totalPrice.required)
+  //   .isNumeric()
+  //   .withMessage(orderMessages.items.totalPrice.invalid),
+
+  body("offers.*.offerId")
+    .optional({ checkFalsy: true })
+    .isMongoId()
+    .withMessage(orderMessages.offers.offerId.invalid),
+
+  body("offers.*.isOfferComplete")
+    .optional({ checkFalsy: true })
+    .isBoolean()
+    .withMessage(orderMessages.offers.isOfferComplete.invalid),
+
+  // body("totalAmount")
+  //   .notEmpty()
+  //   .withMessage(orderMessages.totalAmount.required)
+  //   .isNumeric()
+  //   .withMessage(orderMessages.totalAmount.invalid)
+  //   .custom((value) => value >= 0)
+  //   .withMessage(orderMessages.totalAmount.nonNegative),
+
+  // body("status")
+  //   .notEmpty()
+  //   .withMessage(orderMessages.status.required)
+  //   .isIn(Object.values(OrderStatusses))
+  //   .withMessage(orderMessages.status.invalid),
+
+  body("paymentMethod")
+    .notEmpty()
+    .withMessage(orderMessages.paymentMethod.required)
+    .isIn(Object.values(PaymentTypes))
+    .withMessage(orderMessages.paymentMethod.invalid),
+
+  body("deliveryType")
+    .notEmpty()
+    .withMessage(orderMessages.deliveryType.required)
+    .isIn(Object.values(DeliveryTypes))
+    .withMessage(orderMessages.deliveryType.invalid),
+
+  body("deliveryAddress.address")
+    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.DELIVERY)
+    .notEmpty()
+    .withMessage(orderMessages.deliveryAddress.address.required)
+    .isString()
+    .withMessage(orderMessages.deliveryAddress.address.invalid),
+
+  body("deliveryAddress.latitude")
+    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.DELIVERY)
+    .notEmpty()
+    .withMessage(orderMessages.deliveryAddress.latitude.required)
+    .isNumeric()
+    .withMessage(orderMessages.deliveryAddress.latitude.invalid),
+
+  body("deliveryAddress.longitude")
+    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.DELIVERY)
+    .notEmpty()
+    .withMessage(orderMessages.deliveryAddress.longitude.required)
+    .isNumeric()
+    .withMessage(orderMessages.deliveryAddress.longitude.invalid),
+
+  body("instructions")
+    .optional({ checkFalsy: true })
+    .isString()
+    .withMessage(orderMessages.instructions.invalid),
+];
+
+const categoryValidation = () => [
+  body("name").notEmpty().withMessage(categoryMessages.name.required),
+  body("imageUrl")
+    .optional()
+    .isURL()
+    .withMessage(categoryMessages.imageUrl.required),
+];
+
 const employeeValidation = {
   name: [
     body("firstName").notEmpty().withMessage("First name is required"),
@@ -437,14 +697,6 @@ const employeeValidation = {
   ],
 };
 
-const categoryValidation = () => [
-  body("name").notEmpty().withMessage("Menu name is required"),
-  body("imageUrl")
-    .optional()
-    .isURL()
-    .withMessage("Image URL must be a valid URL"),
-];
-
 const foodItemValidation = () => [
   body("name")
     .isString()
@@ -475,85 +727,6 @@ const foodItemValidation = () => [
     .optional()
     .isString()
     .withMessage("Image URL must be a string."),
-];
-
-// Order validation logic
-const orderValidation = () => [
-  body("customerId")
-    .notEmpty()
-    .withMessage("Customer ID is required")
-    .custom((value) => mongoose.Types.ObjectId.isValid(value))
-    .withMessage("Invalid Customer ID"),
-
-  body("branchId")
-    .notEmpty()
-    .withMessage("Branch ID is required")
-    .custom((value) => mongoose.Types.ObjectId.isValid(value))
-    .withMessage("Invalid Branch ID"),
-
-  body("items")
-    .isArray({ min: 1 })
-    .withMessage("At least one item is required"),
-  body("items.*.foodItem")
-    .optional()
-    .custom((value) => mongoose.Types.ObjectId.isValid(value))
-    .withMessage("Invalid Food Item ID"),
-  body("items.*.quantity")
-    .isInt({ min: 1 })
-    .withMessage("Quantity must be at least 1"),
-  body("items.*.totalPrice")
-    .isFloat({ min: 0 })
-    .withMessage("Total price must be at least 0"),
-
-  body("offers").optional().isArray(),
-  body("offers.*.offer")
-    .notEmpty()
-    .withMessage("Offer ID is required")
-    .custom((value) => mongoose.Types.ObjectId.isValid(value))
-    .withMessage("Invalid Offer ID"),
-  body("offers.*.items").isArray(),
-  body("offers.*.items.*.foodItem")
-    .notEmpty()
-    .withMessage("Food Item ID is required")
-    .custom((value) => mongoose.Types.ObjectId.isValid(value))
-    .withMessage("Invalid Food Item ID"),
-  body("offers.*.items.*.quantity")
-    .isInt({ min: 1 })
-    .withMessage("Quantity must be at least 1"),
-  body("offers.*.totalPrice")
-    .isFloat({ min: 0 })
-    .withMessage("Total price must be at least 0"),
-
-  body("totalAmount")
-    .isFloat({ min: 0 })
-    .withMessage("Total amount must be at least 0"),
-
-  body("status")
-    .isIn(Object.values(OrderStatusses))
-    .withMessage("Invalid order status"),
-
-  body("paymentMethod")
-    .isIn(Object.values(PaymentTypes))
-    .withMessage("Invalid payment method"),
-
-  body("deliveryType")
-    .isIn(Object.values(DeliveryTypes))
-    .withMessage("Invalid delivery type"),
-
-  body("deliveryAddress.address")
-    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
-    .notEmpty()
-    .withMessage("Address is required for delivery"),
-  body("deliveryAddress.latitude")
-    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
-    .isFloat()
-    .withMessage("Latitude is required for delivery"),
-  body("deliveryAddress.longitude")
-    .if(body("deliveryType").equals(DeliveryTypes.DELIVERY))
-    .isFloat()
-    .withMessage("Longitude is required for delivery"),
-
-  body("instructions").optional().isString(),
 ];
 
 // Employee message validation logic
@@ -704,10 +877,10 @@ module.exports = {
   customerValidation,
   branchValidation,
   cartValidation,
-  employeeValidation,
-  categoryValidation,
-  foodItemValidation,
   orderValidation,
+  categoryValidation,
+  employeeValidation,
+  foodItemValidation,
   employeeMessageValidation,
   notificationValidation,
   offerValidation,

@@ -547,6 +547,95 @@ router.get(
   }
 );
 
+// @route   PATCH /admin/order/status/:id
+// @desc    Update existing order status
+// @access  PRIVATE
+router.patch(
+  "/admin/order/status/:id",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [
+    param("id").isMongoId().withMessage(messages.INVALID_ORDER_ID), // Validate order ID
+  ],
+  async (req, res) => {
+    try {
+      // Validate request body
+      if (validateRequest(req, res)) return;
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      // Prepare update data
+      const updateData = { status };
+      updateData.statusHistory = [{ status, timestamp: new Date() }];
+
+      // Update timestamps based on status
+      if (status === OrderStatusses.DELIVERED) {
+        updateData.orderDeliveredAt = new Date();
+      }
+
+      if (status === OrderStatusses.OUT_FOR_DELIVERY) {
+        updateData.completedAt = new Date();
+      }
+
+      // Update the order
+      const updatedOrder = await Order.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
+
+      if (!updatedOrder) {
+        return res.status(404).json({ message: messages.ORDER_NOT_FOUND });
+      }
+
+      const token = req.headers.authorization?.split(" ")[1]; // Extract the token
+
+      // Send notification to the customer
+      await axios.post(
+        `${BACKEND_URL}/api/admin/notification/create`,
+        {
+          recipientId: filteredBody.customerId,
+          recipientType: RecipientTypes.CUSTOMER, // Ensure this is correctly defined
+          message: messages.NOTIFICATION_ORDER_STATUS_UPDATED.message(
+            updatedOrder._id,
+            updatedOrder.status
+          ),
+          type: NotificationTypes.NEW_ORDER, // Ensure this is correctly defined
+          relatedOrderId: updatedOrder._id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Return success response
+      res.status(200).json({
+        message: messages.ORDER_STATUS_UPDATED_SUCCESS,
+        order: updatedOrder,
+      });
+    } catch (error) {
+      // Handle unexpected errors
+      console.error("Order status update error:", error);
+
+      // Log error in MongoDB
+      await logError(
+        `/admin/order/status/${req.params.id}`,
+        "PATCH",
+        error.message,
+        error.stack,
+        req.body
+      );
+
+      res.status(500).json({
+        success: false,
+        message: messages.INTERNAL_SERVER_ERROR,
+        error: error.message,
+      });
+    }
+  }
+);
+
 // @route   GET /admin/branch/employees/:id
 // @desc    Get all employees for a specific branch (with pagination, sorting, and filtering)
 // @access  PRIVATE (Admin Only)

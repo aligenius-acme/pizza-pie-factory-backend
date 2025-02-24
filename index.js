@@ -63,7 +63,7 @@ app.use("/api", require("./routes/admin/notification"));
 app.use("/api", require("./routes/admin/branch"));
 app.use("/api", require("./routes/admin/category"));
 app.use("/api", require("./routes/admin/foodItem"));
-app.use("/api", require("./routes/admin/cart"));
+// app.use("/api", require("./routes/admin/cart"));
 app.use("/api", require("./routes/admin/analytics"));
 app.use("/api", require("./routes/admin/customization"));
 app.use("/api", require("./routes/admin/offer"));
