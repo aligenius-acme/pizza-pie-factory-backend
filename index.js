@@ -62,7 +62,6 @@ app.use("/api", require("./routes/admin/employeeMessage"));
 app.use("/api", require("./routes/admin/notification"));
 app.use("/api", require("./routes/admin/branch"));
 app.use("/api", require("./routes/admin/category"));
-app.use("/api", require("./routes/admin/foodItem"));
 // app.use("/api", require("./routes/admin/cart"));
 app.use("/api", require("./routes/admin/analytics"));
 app.use("/api", require("./routes/admin/customization"));
@@ -71,6 +70,7 @@ app.use("/api", require("./routes/customer"));
 app.use("/api", require("./routes/cart"));
 app.use("/api", require("./routes/order"));
 app.use("/api", require("./routes/category"));
+app.use("/api", require("./routes/foodItem"));
 
 server.listen(port, () => {
   console.log(`Pizza Pie Factory backend app listening on port ${port}`);

@@ -269,6 +269,51 @@ const categoryMessages = {
   },
 };
 
+// FoodItem-related validation messages
+const foodItemMessages = {
+  foodItem: {
+    name: {
+      required: "Food item name is required",
+      invalid: "Food item name must be a string",
+    },
+    description: {
+      invalid: "Food item description must be a string",
+    },
+    price: {
+      required: "Food item price is required",
+      invalid: "Food item price must be a number",
+      nonNegative: "Food item price must be greater than 0",
+    },
+    categories: {
+      required: "Food item categories are required",
+      invalid: "Food item categories must be an array",
+      categoryId: {
+        invalid: "Invalid category ID",
+      },
+    },
+    ingredients: {
+      required: "Food item ingredients are required",
+      invalid: "Food item ingredients must be a string",
+    },
+    nutritionalInfo: {
+      invalid: "Nutritional info must be an object",
+    },
+    customizations: {
+      invalid: "Customizations must be an array",
+      customizationId: {
+        required: "Customization ID is required",
+        invalid: "Invalid customization ID",
+      },
+      isInOffer: {
+        invalid: "Customization offer status must be a boolean",
+      },
+    },
+    imageUrl: {
+      invalid: "Image URL must be a string",
+    },
+  },
+};
+
 // Validation rules for customer fields
 const customerValidation = {
   name: [
@@ -635,6 +680,71 @@ const categoryValidation = () => [
     .withMessage(categoryMessages.imageUrl.required),
 ];
 
+const foodItemValidation = () => [
+  body("name")
+    .trim()
+    .notEmpty()
+    .withMessage(foodItemMessages.foodItem.name.required)
+    .isString()
+    .withMessage(foodItemMessages.foodItem.name.invalid),
+
+  body("description")
+    .optional({ checkFalsy: true })
+    .isString()
+    .withMessage(foodItemMessages.foodItem.description.invalid),
+
+  body("price")
+    .notEmpty()
+    .withMessage(foodItemMessages.foodItem.price.required)
+    .isNumeric()
+    .withMessage(foodItemMessages.foodItem.price.invalid)
+    .custom((value) => value > 0)
+    .withMessage(foodItemMessages.foodItem.price.nonNegative),
+
+  body("categories")
+    .notEmpty()
+    .withMessage(foodItemMessages.foodItem.categories.required)
+    .isArray()
+    .withMessage(foodItemMessages.foodItem.categories.invalid),
+  body("categories.*")
+    .isMongoId()
+    .withMessage(foodItemMessages.foodItem.categories.categoryId.invalid),
+
+  body("ingredients")
+    .notEmpty()
+    .withMessage(foodItemMessages.foodItem.ingredients.required)
+    .isString()
+    .withMessage(foodItemMessages.foodItem.ingredients.invalid),
+
+  body("nutritionalInfo")
+    .optional({ checkFalsy: true })
+    .isObject()
+    .withMessage(foodItemMessages.foodItem.nutritionalInfo.invalid),
+
+  body("customizations")
+    .optional({ checkFalsy: true })
+    .isArray()
+    .withMessage(foodItemMessages.foodItem.customizations.invalid),
+  body("customizations.*.customization")
+    .notEmpty()
+    .withMessage(
+      foodItemMessages.foodItem.customizations.customizationId.required
+    )
+    .isMongoId()
+    .withMessage(
+      foodItemMessages.foodItem.customizations.customizationId.invalid
+    ),
+  body("customizations.*.isInOffer")
+    .optional({ checkFalsy: true })
+    .isBoolean()
+    .withMessage(foodItemMessages.foodItem.customizations.isInOffer.invalid),
+
+  body("imageUrl")
+    .optional({ checkFalsy: true })
+    .isString()
+    .withMessage(foodItemMessages.foodItem.imageUrl.invalid),
+];
+
 const employeeValidation = {
   name: [
     body("firstName").notEmpty().withMessage("First name is required"),
@@ -696,38 +806,6 @@ const employeeValidation = {
     ...employeeValidation.branchId,
   ],
 };
-
-const foodItemValidation = () => [
-  body("name")
-    .isString()
-    .trim()
-    .notEmpty()
-    .withMessage("Name is required and must be a non-empty string."),
-
-  body("description")
-    .optional()
-    .isString()
-    .withMessage("Description must be a string."),
-
-  body("price")
-    .isFloat({ min: 0 })
-    .withMessage("Price is required and must be a non-negative number."),
-
-  body("categories")
-    .notEmpty()
-    .withMessage("Categories must be an array of ObjectIds."),
-
-  body("ingredients")
-    .isString()
-    .trim()
-    .notEmpty()
-    .withMessage("Ingredients are required and must be a non-empty string."),
-
-  body("imageUrl")
-    .optional()
-    .isString()
-    .withMessage("Image URL must be a string."),
-];
 
 // Employee message validation logic
 const employeeMessageValidation = () => [

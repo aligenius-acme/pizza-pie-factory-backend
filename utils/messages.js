@@ -74,4 +74,21 @@ module.exports = {
   CATEGORY_HAS_FOOD_ITEMS:
     "Category cannot be deleted as it has associated food items",
   NO_CATEGORIES_FOUND: "No categories found",
+  CATEGORY_REGISTRATION_SUCCESS: "Category registered successfully",
+  CATEGORY_UPDATE_SUCCESS: "Category updated successfully",
+
+  // Food item messages
+  FOOD_ITEM_EXISTS: "Food item with this name already exists",
+  FOOD_ITEM_NOT_FOUND: "Food item not found",
+  FOOD_ITEM_DELETED_SUCCESS: "Food item deleted successfully",
+  FOOD_ITEM_HAS_ORDERS:
+    "Food item cannot be deleted as it is referenced in orders",
+  NO_FOOD_ITEMS_FOUND: "No food items found",
+  INVALID_CATEGORY_ID: "Invalid category ID(s) provided",
+  CATEGORY_NOT_FOUND: "One or more categories do not exist",
+  INVALID_CUSTOMIZATION_ID: "Invalid customization ID provided",
+  INVALID_CUSTOMIZATION_FORMAT: "Invalid format for customizations",
+  INVALID_CATEGORY_FORMAT: "Invalid format for categories",
+  FOODITEM_REGISTRATION_SUCCESS: "Food item registered successfully",
+  FOODITEM_UPDATE_SUCCESS: "Food item updated successfully",
 };
