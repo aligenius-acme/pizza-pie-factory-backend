@@ -64,6 +64,48 @@ const customerMessages = {
   },
 };
 
+const employeeMessages = {
+  firstName: {
+    required: "First name is required",
+  },
+  lastName: {
+    required: "Last name is required",
+  },
+  email: {
+    invalid: "Invalid email format",
+  },
+  phone: {
+    invalid:
+      "Invalid UAE phone number format. Must start with +971 and be 12-13 digits long.",
+  },
+  password: {
+    required: "Password is required",
+    minLength: "Password must be at least 8 characters long",
+    uppercase: "Password must contain at least one uppercase letter",
+    lowercase: "Password must contain at least one lowercase letter",
+    number: "Password must contain at least one number",
+    specialChar:
+      "Password must contain at least one special character (@$!%*?&)",
+  },
+  role: {
+    label: {
+      required: "Employee role is required",
+      invalid: `Role must be one of: ${Object.values(Roles).join(", ")}`,
+    },
+  },
+  paymentMethod: {
+    type: {
+      required: "Payment type is required",
+      invalid: `Payment type must be one of: ${Object.values(PaymentTypes).join(
+        ", "
+      )}`,
+    },
+    cardToken: {
+      invalid: "Stored card token must be a valid string",
+    },
+  },
+};
+
 // Branch-related validation messages
 const branchMessages = {
   name: {
@@ -747,55 +789,51 @@ const foodItemValidation = () => [
 
 const employeeValidation = {
   name: [
-    body("firstName").notEmpty().withMessage("First name is required"),
-    body("lastName").notEmpty().withMessage("Last name is required"),
+    body("firstName")
+      .trim()
+      .notEmpty()
+      .withMessage(employeeMessages.firstName.required),
+
+    body("lastName")
+      .trim()
+      .notEmpty()
+      .withMessage(employeeMessages.lastName.required),
   ],
   email: [
     body("email")
-      .notEmpty()
-      .withMessage("Email is required")
+      .optional({ checkFalsy: true })
+      .normalizeEmail()
       .isEmail()
-      .withMessage("Invalid email format"),
+      .withMessage(employeeMessages.email.invalid),
   ],
   phone: [
     body("phone")
-      .notEmpty()
-      .withMessage("Phone number is required")
+      .optional({ checkFalsy: true })
+      .trim()
       .matches(/^\+971[0-9]{8,9}$/)
-      .withMessage("Invalid phone number"),
+      .withMessage(employeeMessages.phone.invalid),
   ],
   password: [
     body("password")
       .notEmpty()
-      .withMessage("Password is required")
+      .withMessage(employeeMessages.password.required)
       .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long")
+      .withMessage(employeeMessages.password.minLength)
       .matches(/[A-Z]/)
-      .withMessage("Password must contain at least one uppercase letter")
+      .withMessage(employeeMessages.password.uppercase)
       .matches(/[a-z]/)
-      .withMessage("Password must contain at least one lowercase letter")
+      .withMessage(employeeMessages.password.lowercase)
       .matches(/[0-9]/)
-      .withMessage("Password must contain at least one number")
+      .withMessage(employeeMessages.password.number)
       .matches(/[@$!%*?&]/)
-      .withMessage("Password must contain at least one special character"),
+      .withMessage(employeeMessages.password.specialChar),
   ],
   role: [
     body("role")
       .notEmpty()
-      .withMessage("Role is required")
-      .custom((value) => {
-        if (!Object.values(Roles).includes(value)) {
-          throw new Error("Invalid role");
-        }
-        return true;
-      }),
-  ],
-  branchId: [
-    body("branchId")
-      .notEmpty()
-      .withMessage("Branch is required")
-      .isMongoId()
-      .withMessage("Invalid branch"),
+      .withMessage(employeeMessages.role.label.required)
+      .isIn(Object.values(Roles))
+      .withMessage(employeeMessages.role.label.invalid),
   ],
   all: () => [
     ...employeeValidation.name,
@@ -803,7 +841,6 @@ const employeeValidation = {
     ...employeeValidation.phone,
     ...employeeValidation.password,
     ...employeeValidation.role,
-    ...employeeValidation.branchId,
   ],
 };
 

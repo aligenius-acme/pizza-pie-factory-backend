@@ -21,14 +21,15 @@ const { FRONTEND_URL, PASSWORD_RESET_TOKEN_EXPIRY } = process.env;
 
 // @route   POST /customer/register
 // @desc    Register a new customer or update a guest account
-// @access  Public
+// @access  PUBLIC
 router.post(
   "/customer/register",
   [customerValidation.all()],
   async (req, res) => {
     try {
       // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       // Define allowed fields to prevent unwanted data injection
       const allowedFields = [
@@ -110,15 +111,19 @@ router.post(
 
 // @route   PUT /customer/update/:id
 // @desc    Update customer profile
-// @access  Private
+// @access  PUBLIC
 router.put(
   "/customer/update/:id",
   authMiddleware.authenticateJWT, // Require JWT authentication
-  [param("id").isMongoId(), customerValidation.all()], // Validate ID and request body
+  [
+    param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID),
+    customerValidation.all(),
+  ], // Validate ID and request body
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
@@ -198,14 +203,15 @@ router.put(
 
 // @route   POST /customer/login
 // @desc    Authenticate customer and return JWT token
-// @access  Public
+// @access  PUBLIC
 router.post(
   "/customer/login",
   [customerValidation.email, customerValidation.password], // Validate email and password
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { email, password } = req.body;
 
@@ -249,15 +255,16 @@ router.post(
 
 // @route   GET /customer/get/:id
 // @desc    Get customer profile by ID
-// @access  Private
+// @access  PRIVATE
 router.get(
   "/customer/get/:id",
   authMiddleware.authenticateJWT, // Require JWT authentication
-  [param("id").isMongoId()], // Validate ID
+  [param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID)],
   async (req, res) => {
     try {
       // Validate request parameters
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
@@ -297,14 +304,15 @@ router.get(
 
 // @route   POST /customer/forgot-password
 // @desc    Initiate password reset process
-// @access  Public
+// @access  PUBLIC
 router.post(
   "/customer/forgot-password",
   [customerValidation.email], // Validate email
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { email } = req.body;
 
@@ -366,14 +374,15 @@ router.post(
 // @access  Public
 router.post(
   "/customer/reset-password/:token",
-  [param("token").isString()], // Validate reset token
+  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)], // Validate reset token
   async (req, res) => {
     try {
       const { token } = req.params;
       const { password } = req.body;
 
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       // Find customer by valid reset token
       const customer = await Customer.findOne({

@@ -32,7 +32,7 @@ const EmployeeSchema = new Schema(
     },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpiry: { type: Date, select: false },
-    isDeleted: { type: Boolean, default: false, select: false }, // Soft delete flag
+    isActive: { type: Boolean, default: false, select: false },
   },
   { timestamps: true }
 );
@@ -48,12 +48,14 @@ EmployeeSchema.set("toJSON", {
   },
 });
 
-EmployeeSchema.set("toObject", { virtuals: true });
-
-/** Soft delete method */
-EmployeeSchema.methods.softDelete = async function () {
-  this.isDeleted = true;
-  await this.save();
-};
+EmployeeSchema.set("toObject", {
+  virtuals: true,
+  transform: (_, ret) => {
+    delete ret.password;
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpiry;
+    return ret;
+  },
+});
 
 module.exports = mongoose.model("Employee", EmployeeSchema);

@@ -28,8 +28,8 @@ const CustomerSchema = new Schema(
     deliveryAddresses: [
       {
         label: { type: String, enum: Object.values(AddressLabels) },
-        address: { type: String, required: true },
-        deliveryInstructions: { type: String, default: "" },
+        address: { type: String, required: true, trim: true },
+        deliveryInstructions: { type: String, default: "", trim: true },
         latitude: { type: Number },
         longitude: { type: Number },
         saveForFuture: { type: Boolean, default: false },

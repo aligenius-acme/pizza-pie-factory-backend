@@ -9,11 +9,9 @@ const generateToken = (id, additionalData = {}) =>
   jwt.sign({ id, ...additionalData }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 
 /** Validate request using express-validator */
-const validateRequest = (req, res) => {
+const validateRequest = (req) => {
   const errors = validationResult(req);
-  if (!errors.isEmpty())
-    return res.status(400).json({ errors: errors.array() });
-  return null;
+  return errors.isEmpty() ? null : errors.array();
 };
 
 /** Hash password using bcrypt */

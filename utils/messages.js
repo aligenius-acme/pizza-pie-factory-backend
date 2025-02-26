@@ -6,19 +6,26 @@ module.exports = {
   INTERNAL_SERVER_ERROR: "Internal server error",
   UNAUTHORIZED_ACCESS: "Unauthorized access",
   INVALID_ID: "Invalid ID provided",
-
-  // Customer messages
-  CUSTOMER_EXISTS: "Customer with this email or phone already exists",
-  GUEST_ACCOUNT_UPDATED: "Guest account updated successfully",
-  REGISTRATION_SUCCESS: "Registration successful",
-  PROFILE_UPDATE_SUCCESS: "Profile updated successfully",
-  CUSTOMER_NOT_FOUND: "Customer not found",
   INVALID_CREDENTIALS: "Invalid credentials",
   LOGIN_SUCCESS: "Login successful",
   RESET_EMAIL_SENT: "Password reset link sent to your email",
   RESET_EMAIL_FAILED: "Failed to send reset email",
   INVALID_RESET_TOKEN: "Invalid or expired reset token",
   PASSWORD_RESET_SUCCESS: "Password reset successful",
+  REGISTRATION_SUCCESS: "Registration successful",
+  PROFILE_UPDATE_SUCCESS: "Profile updated successfully",
+
+  // Customer messages
+  CUSTOMER_EXISTS: "Customer with this email or phone already exists",
+  GUEST_ACCOUNT_UPDATED: "Guest account updated successfully",
+  CUSTOMER_NOT_FOUND: "Customer not found",
+  INVALID_CUSTOMER_ID: "Invalid customer ID",
+
+  // Employee messages
+  EMPLOYEE_EXISTS: "Employee with this email or phone already exists",
+  INVALID_EMPLOYEE_ID: "Invalid employee ID",
+  EMPLOYEE_NOT_FOUND: "Employee not found",
+  EMPLOYEE_NOT_ACTIVE: "Employee not active",
 
   // Email messages
   RESET_EMAIL_SUBJECT: "Password Reset Request",
@@ -32,6 +39,7 @@ module.exports = {
   BRANCH_REGISTRATION_SUCCESS: "Branch registered successfully",
   BRANCH_UPDATE_SUCCESS: "Branch updated successfully",
   NO_BRANCHES_FOUND: "No branches found",
+  INVALID_BRANCH_ID: "Invalid branch ID",
 
   // Cart messages
   CART_CREATED_SUCCESS: "Cart created successfully",
