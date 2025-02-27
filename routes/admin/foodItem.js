@@ -3,14 +3,13 @@ const { param } = require("express-validator");
 const FoodItem = require("../../models/FoodItem");
 const Order = require("../../models/Order");
 const Category = require("../../models/Category");
-const Customization = require("../../models/Customization");
 const mongoose = require("mongoose");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
 const { foodItemValidation } = require("../../utils/validation");
-const { validateRequest } = require("../../utils/helpers");
+const { validateRequest, logError } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 
 // Configure Cloudinary
@@ -25,6 +24,24 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
+// Utility function to strip unwanted fields
+const stripUnwantedFields = (body, schema) => {
+  const schemaPaths = Object.keys(schema.paths);
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) => schemaPaths.includes(key))
+  );
+};
+
+// Centralized error handling
+const handleError = async (route, method, error, req, res) => {
+  console.error(`${route} error:`, error);
+  await logError(route, method, error.message, error.stack, req.body);
+  res.status(500).json({
+    message: messages.INTERNAL_SERVER_ERROR,
+    error: error.message,
+  });
+};
+
 // @route   POST /admin/fooditem/register
 // @desc    Register a new food item (Admin Only)
 // @access  PRIVATE (Admin Only)
@@ -37,25 +54,11 @@ router.post(
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = [
-        "name",
-        "description",
-        "price",
-        "categories",
-        "ingredients",
-        "nutritionalInfo",
-        "customizations",
-      ];
-
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, FoodItem.schema);
 
       // Parse and validate categories
       let categories = filteredBody.categories;
@@ -164,22 +167,7 @@ router.post(
         foodItem,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Food item registration error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/fooditem/register",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/admin/fooditem/register", "POST", error, req, res);
     }
   }
 );
@@ -199,26 +187,13 @@ router.put(
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
-      const allowedFields = [
-        "name",
-        "description",
-        "price",
-        "categories",
-        "ingredients",
-        "nutritionalInfo",
-        "customizations",
-      ];
 
-      // Filter request body to only include allowed fields
-      const filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, FoodItem.schema);
 
       // Parse and validate categories
       if (
@@ -336,22 +311,13 @@ router.put(
         foodItem,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Food item update error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/fooditem/update/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/fooditem/update/${req.params.id}`,
         "PUT",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );
@@ -367,7 +333,8 @@ router.delete(
   async (req, res) => {
     try {
       // Validate request parameters
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
@@ -394,72 +361,91 @@ router.delete(
       // Return success response
       res.status(200).json({ message: messages.FOOD_ITEM_DELETED_SUCCESS });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Food item delete error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/fooditem/delete/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/fooditem/delete/${req.params.id}`,
         "DELETE",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );
 
-// // @route   GET /admin/foodItem/best-selling
-// // @desc    Get the best-selling food items (Admin Only)
-// // @access  PRIVATE (Admin Only)
-// router.get(
-//   "/admin/foodItem/best-selling",
-//   authMiddleware.authenticateJWT, // Authenticate JWT
-//   authMiddleware.authenticateAdmin, // Ensure user is an admin
-//   async (req, res) => {
-//     try {
-//       // Aggregate to find the best-selling food items
-//       const bestSellingItems = await Order.aggregate([
-//         { $unwind: "$items" },
-//         {
-//           $group: {
-//             _id: "$items.foodItemId",
-//             totalQuantity: { $sum: "$items.quantity" },
-//           },
-//         },
-//         { $sort: { totalQuantity: -1 } },
-//         { $limit: 10 },
-//         {
-//           $lookup: {
-//             from: "fooditems",
-//             localField: "_id",
-//             foreignField: "_id",
-//             as: "foodItem",
-//           },
-//         },
-//         { $unwind: "$foodItem" },
-//         {
-//           $project: {
-//             _id: 1,
-//             name: "$foodItem.name",
-//             price: "$foodItem.price",
-//             totalQuantity: 1,
-//           },
-//         },
-//       ]);
+// @route   GET /admin/fooditem/branch/top/:branchId
+// @desc    Get top 10 best-selling products for a specific branch
+// @access  PRIVATE
+router.get(
+  "/admin/fooditem/branch/top/:branchId",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [param("branchId").isMongoId().withMessage(messages.INVALID_ID)], // Validate branch ID
+  async (req, res) => {
+    try {
+      // Validate request parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-//       // Return success response
-//       res.status(200).json(bestSellingItems);
-//     } catch (error) {
-//       console.error(error);
-//       res.status(500).json({ message: messages.INTERNAL_SERVER_ERROR });
-//     }
-//   }
-// );
+      const { branchId } = req.params;
+
+      // Aggregate to find top 10 best-selling products
+      const topProducts = await Order.aggregate([
+        // Match orders for the specific branch
+        { $match: { id: mongoose.Types.ObjectId(branchId) } },
+        // Unwind the items array to process each item individually
+        { $unwind: "$items" },
+        // Group by foodItem and calculate total quantity sold
+        {
+          $group: {
+            _id: "$items.foodItem",
+            totalQuantity: { $sum: "$items.quantity" },
+          },
+        },
+        // Sort by totalQuantity in descending order
+        { $sort: { totalQuantity: -1 } },
+        // Limit to top 10 products
+        { $limit: 10 },
+        // Lookup to populate foodItem details
+        {
+          $lookup: {
+            from: "fooditems", // Collection name for FoodItem
+            localField: "_id",
+            foreignField: "_id",
+            as: "foodItemDetails",
+          },
+        },
+        // Unwind the foodItemDetails array (since lookup returns an array)
+        { $unwind: "$foodItemDetails" },
+        // Project the required fields, including imageUrl
+        {
+          $project: {
+            _id: 0,
+            foodItemId: "$_id",
+            name: "$foodItemDetails.name",
+            imageUrl: "$foodItemDetails.imageUrl", // Include imageUrl
+            totalQuantity: 1,
+          },
+        },
+      ]);
+
+      if (!topProducts || topProducts.length === 0) {
+        return res.status(404).json({ message: messages.NO_PRODUCTS_FOUND });
+      }
+
+      // Return success response with the top 10 best-selling products
+      res.status(200).json({
+        success: true,
+        data: topProducts,
+      });
+    } catch (error) {
+      handleError(
+        `/admin/fooditem/branch/top/${req.params.branchId}`,
+        "GET",
+        error,
+        req,
+        res
+      );
+    }
+  }
+);
 
 module.exports = router;

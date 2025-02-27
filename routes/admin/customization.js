@@ -3,132 +3,169 @@ const { param } = require("express-validator");
 const Customization = require("../../models/Customization");
 const authMiddleware = require("../../middleware/auth");
 const { customizationValidation } = require("../../utils/validation");
-const { validateRequest } = require("../../utils/helpers");
+const {
+  validateRequest,
+  stripUnwantedFields,
+  handleError,
+} = require("../../utils/helpers");
+const messages = require("../../utils/messages");
 
 const router = express.Router();
 
 // @route   POST /admin/customization/register
+// @desc    Register a new customization (Admin Only)
 // @access  PRIVATE (Admin Only)
 router.post(
   "/admin/customization/register",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [...customizationValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [...customizationValidation()], // Apply customization validation rules
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request body
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = ["offerId", "customizationName", "customizations"];
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Customization.schema);
 
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
-
+      // Check if customization with the same name already exists
       const existingCustomization = await Customization.findOne({
         name: filteredBody.customizationName,
       }).lean();
 
       if (existingCustomization) {
-        return res
-          .status(400)
-          .json({ message: "Customization with this name already exists" });
+        return res.status(400).json({ message: messages.CUSTOMIZATION_EXISTS });
       }
 
-      let customizationData = filteredBody;
-      const customization = new Customization(customizationData);
+      // Create and save the customization
+      const customization = new Customization(filteredBody);
       await customization.save();
-      res.status(201).json(customization);
+
+      // Return success response
+      res.status(201).json({
+        message: messages.CUSTOMIZATION_REGISTRATION_SUCCESS,
+        customization,
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/customization/register", "POST", error, req, res);
     }
   }
 );
 
 // @route   PUT /admin/customization/:id
+// @desc    Update an existing customization (Admin Only)
 // @access  PRIVATE (Admin Only)
 router.put(
   "/admin/customization/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [...customizationValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [...customizationValidation()], // Apply customization validation rules
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request body
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = ["offerId", "customizationName", "customizations"];
+      const { id } = req.params;
 
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Customization.schema);
 
+      // Check if customization with the same name already exists (excluding the current one)
       const existingCustomization = await Customization.findOne({
         name: filteredBody.customizationName,
-        _id: { $ne: req.params.id },
+        _id: { $ne: id },
       }).lean();
 
       if (existingCustomization) {
-        return res
-          .status(400)
-          .json({ message: "Customization with this name already exists" });
+        return res.status(400).json({ message: messages.CUSTOMIZATION_EXISTS });
       }
 
+      // Find and update the customization
       const customization = await Customization.findByIdAndUpdate(
-        req.params.id,
+        id,
         filteredBody,
         { new: true }
       ).lean();
 
       if (!customization) {
-        return res.status(404).json({ message: "Customization not found" });
+        return res
+          .status(404)
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
       }
 
-      res.status(200).json(customization);
+      // Return success response
+      res.status(200).json({
+        message: messages.CUSTOMIZATION_UPDATE_SUCCESS,
+        customization,
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/customization/${req.params.id}`,
+        "PUT",
+        error,
+        req,
+        res
+      );
     }
   }
 );
 
 // @route   GET /admin/customization/:id
+// @desc    Get a customization by ID (Admin Only)
 // @access  PRIVATE (Admin Only)
 router.get(
   "/admin/customization/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [param("id").isMongoId().withMessage("Invalid food item ID")],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate customization ID
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const customization = await Customization.findById(req.params.id).lean();
+      const { id } = req.params;
+
+      // Find the customization by ID
+      const customization = await Customization.findById(id).lean();
       if (!customization) {
-        return res.status(404).json({ message: "Customization not found" });
+        return res
+          .status(404)
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
       }
+
+      // Return success response
       res.status(200).json(customization);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/customization/${req.params.id}`,
+        "GET",
+        error,
+        req,
+        res
+      );
     }
   }
 );
 
 // @route   GET /admin/customizations
+// @desc    Get all customizations (Admin Only)
 // @access  PRIVATE (Admin Only)
 router.get(
   "/admin/customizations",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
   async (req, res) => {
     try {
+      // Fetch all customizations
       const customizations = await Customization.find().lean();
+
+      // Return success response
       res.status(200).json(customizations);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/customizations", "GET", error, req, res);
     }
   }
 );

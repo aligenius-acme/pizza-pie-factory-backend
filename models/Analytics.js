@@ -12,6 +12,7 @@ const AnalyticsSchema = new Schema(
     averageDeliveryTime: { type: Number, required: true, min: 0 },
     totalOrdersToday: { type: Number, required: true, min: 0 },
     totalRevenueToday: { type: Number, required: true, min: 0 },
+    topFoodItems: [{ type: Schema.Types.ObjectId, ref: "FoodItem" }],
     lastUpdated: { type: Date, default: Date.now },
   },
   { timestamps: true }

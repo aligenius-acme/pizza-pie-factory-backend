@@ -5,24 +5,29 @@ const Customer = require("../../models/Customer");
 const authMiddleware = require("../../middleware/auth");
 const { RecipientTypes, NotificationTypes } = require("../../utils/enums");
 const { notificationValidation } = require("../../utils/validation");
-
-const { sendEmail } = require("../../utils/email");
-const { sendSms } = require("../../utils/sms");
+const { sendEmail, sendSms } = require("../../utils/notifications");
+const { stripUnwantedFields, handleError } = require("../../utils/helpers");
+const messages = require("../../utils/messages");
 
 const router = express.Router();
 
-// POST /admin/notification/create
-// Access: PRIVATE
+// @route   POST /admin/notification/create
+// @desc    Create a new notification
+// @access  PRIVATE (Admin Only)
 router.post(
   "/admin/notification/create",
-  authMiddleware.authenticateJWT,
-  [...notificationValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [...notificationValidation()], // Apply notification validation rules
   async (req, res) => {
     try {
+      // Validate request body
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
+
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Notification.schema);
 
       const {
         recipientId,
@@ -31,29 +36,36 @@ router.post(
         type,
         relatedOrderId,
         branchId,
-      } = req.body;
+      } = filteredBody;
 
-      let notificationData = {
+      // Prepare notification data
+      const notificationData = {
         recipientType,
         message,
         type,
         relatedOrderId,
       };
 
+      // Add branchId if recipientType is BRANCH
       if (recipientType === RecipientTypes.BRANCH) {
         notificationData.branchId = branchId;
       }
 
+      // Create and save the notification
       const notification = new Notification(notificationData);
       await notification.save();
 
+      // Get the Socket.IO instance
       const io = req.app.get("io");
 
+      // Handle notifications based on recipient type
       if (recipientType === RecipientTypes.CUSTOMER) {
         const customer = await Customer.findById(recipientId).lean();
         if (!customer) {
-          return res.status(400).json({ message: "Customer not found" });
+          return res.status(400).json({ message: messages.CUSTOMER_NOT_FOUND });
         }
+
+        // Send email and SMS for specific notification types
         if (
           type === NotificationTypes.ORDER_UPDATE ||
           type === NotificationTypes.PROMOTION
@@ -68,126 +80,173 @@ router.post(
           );
           await sendSms(customerPhone, message);
         } else {
+          // Emit Socket.IO event for real-time notifications
           io.to(recipientId.toString()).emit("newNotification", notification);
         }
       } else if (recipientType === RecipientTypes.EMPLOYEE) {
+        // Emit Socket.IO event for employees
         if (branchId) {
           io.to(branchId.toString()).emit("newNotification", notification);
         } else {
           io.emit("newNotification", notification);
         }
       } else {
+        // Emit Socket.IO event for other recipient types
         if (recipientId) {
           io.to(recipientId.toString()).emit("newNotification", notification);
         }
       }
 
+      // Return success response
       res.status(201).json(notification);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/notification/create", "POST", error, req, res);
     }
   }
 );
 
-// GET /admin/notifications
-// Retrieve all notifications
-// Access: Site admin only
+// @route   GET /admin/notifications
+// @desc    Retrieve all notifications
+// @access  PRIVATE (Admin Only)
 router.get(
   "/admin/notifications",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
   async (req, res) => {
     try {
+      // Fetch all notifications sorted by creation date
       const notifications = await Notification.find()
         .sort({ createdAt: -1 })
         .lean();
+
+      // Return success response
       res.status(200).json(notifications);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/notifications", "GET", error, req, res);
     }
   }
 );
 
-// GET /admin/notification/get/:id
-// Retrieve a notification by ID
-// Access: Site admin only
+// @route   GET /admin/notification/get/:id
+// @desc    Retrieve a notification by ID
+// @access  PRIVATE (Admin Only)
 router.get(
   "/admin/notification/get/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [param("id").isMongoId().withMessage("Invalid notification ID")],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [param("id").isMongoId().withMessage(messages.INVALID_NOTIFICATION_ID)], // Validate notification ID
   async (req, res) => {
     try {
+      // Validate request parameters
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const notification = await Notification.findById(req.params.id).lean();
+      const { id } = req.params;
+
+      // Find the notification by ID
+      const notification = await Notification.findById(id).lean();
       if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
+        return res
+          .status(404)
+          .json({ message: messages.NOTIFICATION_NOT_FOUND });
       }
+
+      // Return success response
       res.status(200).json(notification);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/notification/get/${req.params.id}`,
+        "GET",
+        error,
+        req,
+        res
+      );
     }
   }
 );
 
-// PUT /admin/notification/mark-read/:id
-// Mark a notification as read
-// Access: Site admin only
+// @route   PUT /admin/notification/mark-read/:id
+// @desc    Mark a notification as read
+// @access  PRIVATE (Admin Only)
 router.put(
   "/admin/notification/mark-read/:id",
-  authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage("Invalid notification ID")],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [param("id").isMongoId().withMessage(messages.INVALID_NOTIFICATION_ID)], // Validate notification ID
   async (req, res) => {
     try {
+      // Validate request parameters
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
+      const { id } = req.params;
+
+      // Update the notification to mark it as read
       const notification = await Notification.findByIdAndUpdate(
-        req.params.id,
+        id,
         { read: true },
         { new: true }
       );
 
       if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
+        return res
+          .status(404)
+          .json({ message: messages.NOTIFICATION_NOT_FOUND });
       }
 
-      res(200).json(notification);
+      // Return success response
+      res.status(200).json(notification);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/notification/mark-read/${req.params.id}`,
+        "PUT",
+        error,
+        req,
+        res
+      );
     }
   }
 );
 
-// DELETE /admin/notification/delete/:id
-// Delete a notification
-// Access: Site admin only
+// @route   DELETE /admin/notification/delete/:id
+// @desc    Delete a notification
+// @access  PRIVATE (Admin Only)
 router.delete(
   "/admin/notification/delete/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [param("id").isMongoId().withMessage("Invalid notification ID")],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [param("id").isMongoId().withMessage(messages.INVALID_NOTIFICATION_ID)], // Validate notification ID
   async (req, res) => {
     try {
+      // Validate request parameters
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const notification = await Notification.findByIdAndDelete(req.params.id);
+      const { id } = req.params;
+
+      // Delete the notification
+      const notification = await Notification.findByIdAndDelete(id);
       if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
+        return res
+          .status(404)
+          .json({ message: messages.NOTIFICATION_NOT_FOUND });
       }
 
-      res.status(204).json({ message: "Notification deleted successfully" });
+      // Return success response
+      res.status(204).json({ message: messages.NOTIFICATION_DELETED_SUCCESS });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/notification/delete/${req.params.id}`,
+        "DELETE",
+        error,
+        req,
+        res
+      );
     }
   }
 );

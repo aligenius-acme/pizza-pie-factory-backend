@@ -11,9 +11,10 @@ const {
   generateToken,
   validateRequest,
   hashPassword,
-  logError,
+  stripUnwantedFields,
+  handleError,
 } = require("../../utils/helpers");
-const messages = require("../../utils/messages"); // Import messages
+const messages = require("../../utils/messages");
 require("dotenv").config();
 
 const router = express.Router();
@@ -24,32 +25,16 @@ const { FRONTEND_URL, PASSWORD_RESET_TOKEN_EXPIRY } = process.env;
 // @access  PRIVATE (Admin Only)
 router.post(
   "/admin/employee/register",
-  authMiddleware.authenticateJWT, // Require JWT authentication
-  authMiddleware.authenticateAdmin, // Require admin role
-  [employeeValidation.all()], // Validate all employee fields
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  [employeeValidation.all()],
   async (req, res) => {
     try {
-      // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      // Define allowed fields to prevent unwanted data injection
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "email",
-        "phone",
-        "password",
-        "role",
-        "branchId",
-      ];
-
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value != null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Employee.schema);
 
       // Verify that the branch exists
       const branch = await Branch.findById(filteredBody.branchId).lean();
@@ -58,14 +43,12 @@ router.post(
       }
 
       // Check if an employee with the same email or phone already exists
-      let existingEmployee = await Employee.findOne({
+      const existingEmployee = await Employee.findOne({
         $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
       }).lean();
 
       if (existingEmployee) {
-        return res.status(400).json({
-          message: messages.EMPLOYEE_EXISTS,
-        });
+        return res.status(400).json({ message: messages.EMPLOYEE_EXISTS });
       }
 
       // Hash the password before saving
@@ -81,22 +64,7 @@ router.post(
         token: generateToken(employee._id, { role: employee.role }),
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee registration error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/employee/register",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/admin/employee/register", "POST", error, req, res);
     }
   }
 );
@@ -106,48 +74,30 @@ router.post(
 // @access  PRIVATE (Admin Only)
 router.put(
   "/admin/employee/update/:id",
-  authMiddleware.authenticateJWT, // Require JWT authentication
-  authMiddleware.authenticateAdmin, // Require admin role
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
   [
-    param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID), // Validate employee ID
-    employeeValidation.all(), // Validate all employee fields
+    param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID),
+    employeeValidation.all(),
   ],
   async (req, res) => {
     try {
-      // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
-      // Define allowed fields to prevent unwanted data injection
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "email",
-        "phone",
-        "password",
-        "role",
-        "branchId",
-      ];
-
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Employee.schema);
 
       // Check if another employee with the same email or phone already exists
-      let existingEmployee = await Employee.findOne({
+      const existingEmployee = await Employee.findOne({
         $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
         _id: { $ne: id }, // Exclude the current employee from the check
       }).lean();
 
       if (existingEmployee) {
-        return res.status(400).json({
-          message: messages.EMPLOYEE_EXISTS,
-        });
+        return res.status(400).json({ message: messages.EMPLOYEE_EXISTS });
       }
 
       // Verify that the branch exists
@@ -157,7 +107,7 @@ router.put(
       }
 
       // Find the employee by ID
-      let employee = await Employee.findById(id).select("-password");
+      const employee = await Employee.findById(id).select("-password");
       if (!employee) {
         return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
       }
@@ -177,22 +127,13 @@ router.put(
         employee,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee update error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/employee/update/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/employee/update/${req.params.id}`,
         "PUT",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );
@@ -202,11 +143,11 @@ router.put(
 // @access  PUBLIC
 router.post(
   "/admin/employee/login",
-  [employeeValidation.email, employeeValidation.password], // Validate email and password
+  [employeeValidation.email, employeeValidation.password],
   async (req, res) => {
     try {
-      // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { email, password } = req.body;
 
@@ -233,22 +174,7 @@ router.post(
         token: generateToken(employee._id, { role: employee.role }),
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee login error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/employee/login",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/admin/employee/login", "POST", error, req, res);
     }
   }
 );
@@ -258,12 +184,12 @@ router.post(
 // @access  PRIVATE
 router.get(
   "/admin/employee/get/:id",
-  authMiddleware.authenticateJWT, // Require JWT authentication
-  [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)], // Validate employee ID
+  authMiddleware.authenticateJWT,
+  [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)],
   async (req, res) => {
     try {
-      // Validate request parameters
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
@@ -276,22 +202,13 @@ router.get(
       // Return success response with employee details
       res.status(200).json(employee);
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee get error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/employee/get/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/employee/get/${req.params.id}`,
         "GET",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );
@@ -301,11 +218,11 @@ router.get(
 // @access  PUBLIC
 router.post(
   "/admin/employee/forgot-password",
-  [employeeValidation.email], // Validate email
+  [employeeValidation.email],
   async (req, res) => {
     try {
-      // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { email } = req.body;
 
@@ -340,26 +257,9 @@ router.post(
       }
 
       // Return success response
-      res.status(200).json({
-        message: messages.RESET_EMAIL_SENT,
-      });
+      res.status(200).json({ message: messages.RESET_EMAIL_SENT });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee password forgot:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/employee/forgot-password",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/admin/employee/forgot-password", "POST", error, req, res);
     }
   }
 );
@@ -369,14 +269,15 @@ router.post(
 // @access  PUBLIC
 router.post(
   "/admin/employee/reset-password/:token",
-  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)], // Validate reset token
+  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)],
   async (req, res) => {
     try {
       const { token } = req.params;
       const { password } = req.body;
 
-      // Validate request body against validation rules
-      if (validateRequest(req, res)) return;
+      // Validate request body
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       // Find the employee by valid reset token
       const employee = await Employee.findOne({
@@ -395,26 +296,87 @@ router.post(
       await employee.save();
 
       // Return success response
+      res.status(200).json({ message: messages.PASSWORD_RESET_SUCCESS });
+    } catch (error) {
+      handleError("/admin/employee/reset-password", "POST", error, req, res);
+    }
+  }
+);
+
+// @route   GET /admin/employee/branch/:branchId
+// @desc    Get all employees for a specific branch (with pagination, sorting, and filtering)
+// @access  PRIVATE (Admin Only)
+router.get(
+  "/admin/employee/branch:branchId",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [
+    param("id").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
+    query("sortBy").optional().isString(), // Validate sortBy (optional)
+    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
+    query("role").optional().isString(), // Validate role (optional)
+  ],
+  async (req, res) => {
+    try {
+      // Validate request parameters and query
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const { branchId } = req.params;
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        order = "desc",
+        role, // Optional filtering by role
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      // Build filter object
+      let filter = { branchId: branchId, isDeleted: false }; // Exclude soft-deleted employees
+      if (role) {
+        filter.role = role; // Filter by role if provided
+      }
+
+      // Find all employees for the branch with pagination and sorting
+      const employees = await Employee.find(filter)
+        .select("-password -resetPasswordToken -resetPasswordExpiry") // Exclude sensitive fields
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
+        .lean();
+
+      if (!employees || employees.length === 0) {
+        return res.status(404).json({ message: messages.NO_EMPLOYEES_FOUND });
+      }
+
+      // Get the total count of employees for the branch
+      const totalCount = await Employee.countDocuments(filter);
+
+      // Return success response with the employees and pagination details
       res.status(200).json({
-        message: messages.PASSWORD_RESET_SUCCESS,
+        success: true,
+        data: employees,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Employee password reset:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/employee/reset-password",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
+      handleError(
+        `/admin/employee/branch/${req.params.branchId}`,
+        "GET",
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );

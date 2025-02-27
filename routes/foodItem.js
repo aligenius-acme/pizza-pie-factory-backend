@@ -7,6 +7,16 @@ const messages = require("../utils/messages");
 
 const router = express.Router();
 
+// Centralized error handling
+const handleError = async (route, method, error, req, res) => {
+  console.error(`${route} error:`, error);
+  await logError(route, method, error.message, error.stack, req.body);
+  res.status(500).json({
+    message: messages.INTERNAL_SERVER_ERROR,
+    error: error.message,
+  });
+};
+
 // @route   GET /fooditems
 // @desc    Get all food items with pagination and filtering
 // @access  PUBLIC
@@ -21,7 +31,8 @@ router.get(
   async (req, res) => {
     try {
       // Validate request parameters and query
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const {
         page = 1,
@@ -42,8 +53,6 @@ router.get(
 
       // Fetch food items with pagination and filtering
       const foodItems = await FoodItem.find(filter)
-        .populate({ path: "categories", select: "name" })
-        .populate({ path: "orders", select: "status createdAt" })
         .sort({ [sortBy]: sortOrder })
         .skip((pageNumber - 1) * pageSize)
         .limit(pageSize)
@@ -68,16 +77,7 @@ router.get(
         },
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Get food items error:", error);
-
-      // Log error in MongoDB
-      await logError("/fooditems", "GET", error.message, error.stack, req.body);
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/fooditems", "GET", error, req, res);
     }
   }
 );
@@ -91,15 +91,13 @@ router.get(
   async (req, res) => {
     try {
       // Validate request parameters
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
       // Find the food item by ID and populate related fields
-      const foodItem = await FoodItem.findById(id)
-        .populate({ path: "categories", select: "name" })
-        .populate({ path: "orders", select: "status createdAt" })
-        .lean();
+      const foodItem = await FoodItem.findById(id).lean();
 
       if (!foodItem) {
         return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
@@ -108,22 +106,7 @@ router.get(
       // Return success response
       res.status(200).json(foodItem);
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Food item get error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/fooditem/get/${param("id").isMongoId()}`,
-        "GET",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError(`/fooditem/get/${req.params.id}`, "GET", error, req, res);
     }
   }
 );

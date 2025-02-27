@@ -11,7 +11,8 @@ const {
   generateToken,
   validateRequest,
   hashPassword,
-  logError,
+  stripUnwantedFields,
+  handleError,
 } = require("../utils/helpers");
 const messages = require("../utils/messages");
 require("dotenv").config();
@@ -27,26 +28,11 @@ router.post(
   [customerValidation.all()],
   async (req, res) => {
     try {
-      // Validate request body against validation rules
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
-      // Define allowed fields to prevent unwanted data injection
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "email",
-        "phone",
-        "password",
-        "deliveryAddresses",
-        "paymentMethods",
-        "isGuest",
-      ];
-
-      // Filter request body to only include allowed fields
-      const filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Customer.schema);
 
       // Check if customer already exists (skip for guest accounts)
       let customer =
@@ -61,7 +47,6 @@ router.post(
 
       // Handle existing customer scenarios
       if (customer) {
-        // If existing customer is a guest, update their account
         if (customer.isGuest && filteredBody.isGuest) {
           Object.assign(customer, filteredBody);
           await Customer.findByIdAndUpdate(customer._id, customer);
@@ -70,7 +55,6 @@ router.post(
             token: generateToken(customer._id),
           });
         }
-        // If customer already exists and is not a guest, return error
         return res.status(400).json({ message: messages.CUSTOMER_EXISTS });
       }
 
@@ -89,39 +73,23 @@ router.post(
         token: generateToken(customer._id),
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer registration error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/customer/register",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/customer/register", "POST", error, req, res);
     }
   }
 );
 
 // @route   PUT /customer/update/:id
 // @desc    Update customer profile
-// @access  PUBLIC
+// @access  PRIVATE
 router.put(
   "/customer/update/:id",
-  authMiddleware.authenticateJWT, // Require JWT authentication
+  authMiddleware.authenticateJWT,
   [
     param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID),
     customerValidation.all(),
-  ], // Validate ID and request body
+  ],
   async (req, res) => {
     try {
-      // Validate request body
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
@@ -132,23 +100,8 @@ router.put(
         return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
       }
 
-      // Define allowed fields for updates
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "email",
-        "phone",
-        "password",
-        "deliveryAddresses",
-        "paymentMethods",
-        "loyaltyPoints",
-        "isGuest",
-      ];
-
-      // Filter request body to only include allowed fields
-      const filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Customer.schema);
 
       // Check for duplicate email or phone (excluding the current user)
       const existingCustomer = await Customer.findOne({
@@ -181,22 +134,7 @@ router.put(
         customer,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer update error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/customer/update/${param("id").isMongoId()}`,
-        "PUT",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError(`/customer/update/${req.params.id}`, "PUT", error, req, res);
     }
   }
 );
@@ -206,10 +144,9 @@ router.put(
 // @access  PUBLIC
 router.post(
   "/customer/login",
-  [customerValidation.email, customerValidation.password], // Validate email and password
+  [customerValidation.email, customerValidation.password],
   async (req, res) => {
     try {
-      // Validate request body
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
@@ -233,22 +170,7 @@ router.post(
         token: generateToken(customer._id),
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer login error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/customer/login",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/customer/login", "POST", error, req, res);
     }
   }
 );
@@ -258,11 +180,10 @@ router.post(
 // @access  PRIVATE
 router.get(
   "/customer/get/:id",
-  authMiddleware.authenticateJWT, // Require JWT authentication
+  authMiddleware.authenticateJWT,
   [param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID)],
   async (req, res) => {
     try {
-      // Validate request parameters
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
@@ -282,22 +203,7 @@ router.get(
       // Return customer data
       res.status(200).json(customer);
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer get error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/customer/get/${param("id").isMongoId()}`,
-        "GET",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError(`/customer/get/${req.params.id}`, "GET", error, req, res);
     }
   }
 );
@@ -307,10 +213,9 @@ router.get(
 // @access  PUBLIC
 router.post(
   "/customer/forgot-password",
-  [customerValidation.email], // Validate email
+  [customerValidation.email],
   async (req, res) => {
     try {
-      // Validate request body
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
@@ -349,32 +254,17 @@ router.post(
       // Return success response
       res.status(200).json({ message: messages.RESET_EMAIL_SENT });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer password forgot:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/customer/forgot-password",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/customer/forgot-password", "POST", error, req, res);
     }
   }
 );
 
 // @route   POST /customer/reset-password/:token
 // @desc    Reset customer password using reset token
-// @access  Public
+// @access  PUBLIC
 router.post(
   "/customer/reset-password/:token",
-  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)], // Validate reset token
+  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)],
   async (req, res) => {
     try {
       const { token } = req.params;
@@ -403,22 +293,7 @@ router.post(
       // Return success response
       res.status(200).json({ message: messages.PASSWORD_RESET_SUCCESS });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Customer password reset:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/customer/reset-password",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/customer/reset-password", "POST", error, req, res);
     }
   }
 );

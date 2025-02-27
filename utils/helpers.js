@@ -86,10 +86,29 @@ const logError = async (
   }
 };
 
+// Utility function to strip unwanted fields
+const stripUnwantedFields = (body, schema) => {
+  const schemaPaths = Object.keys(schema.paths);
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) => schemaPaths.includes(key))
+  );
+};
+
+// Centralized error handling
+const handleError = async (route, method, error, req, res) => {
+  console.error(`${route} error:`, error);
+  await logError(route, method, error.message, error.stack, req.body);
+  res.status(500).json({
+    message: messages.INTERNAL_SERVER_ERROR,
+    error: error.message,
+  });
+};
+
 module.exports = {
   generateToken,
   validateRequest,
   hashPassword,
   isWithinDeliveryRadius,
-  logError,
+  stripUnwantedFields,
+  handleError,
 };

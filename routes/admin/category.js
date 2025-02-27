@@ -7,7 +7,11 @@ const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
 const { categoryValidation } = require("../../utils/validation");
-const { validateRequest } = require("../../utils/helpers");
+const {
+  validateRequest,
+  stripUnwantedFields,
+  handleError,
+} = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 
 // Configure Cloudinary
@@ -34,17 +38,11 @@ router.post(
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = ["name"];
-
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Category.schema);
 
       // Check if category with the same name already exists
       const existingCategory = await Category.findOne({
@@ -85,22 +83,7 @@ router.post(
         category,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Category registration error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/admin/category/register",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/admin/category/register", "POST", error, req, res);
     }
   }
 );
@@ -120,10 +103,10 @@ router.put(
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
-      const allowedFields = ["name"];
 
       // Find the category by ID
       const category = await Category.findById(id);
@@ -131,13 +114,8 @@ router.put(
         return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
       }
 
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Category.schema);
 
       const oldName = category.name;
 
@@ -176,22 +154,13 @@ router.put(
         category,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Category update error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/category/update/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/category/update/${req.params.id}`,
         "PUT",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );
@@ -207,7 +176,8 @@ router.delete(
   async (req, res) => {
     try {
       // Validate request parameters
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
 
@@ -236,22 +206,13 @@ router.delete(
       // Return success response
       res.status(200).json({ message: messages.CATEGORY_DELETED_SUCCESS });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Category delete error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/admin/category/delete/${param("id").isMongoId()}`,
+      handleError(
+        `/admin/category/delete/${req.params.id}`,
         "DELETE",
-        error.message,
-        error.stack,
-        req.body
+        error,
+        req,
+        res
       );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
     }
   }
 );

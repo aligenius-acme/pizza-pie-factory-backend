@@ -9,53 +9,59 @@ const cloudinary = require("cloudinary").v2;
 const Offer = require("../../models/Offer");
 const Category = require("../../models/Category");
 const Customization = require("../../models/Customization");
-const { validateRequest } = require("../../utils/helpers");
+const { validateRequest, logError } = require("../../utils/helpers");
+const messages = require("../../utils/messages");
 
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Configure Multer for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
-// POST /admin/offer/register
-// Access: PRIVATE (Admin Only)
+// Utility function to strip unwanted fields
+const stripUnwantedFields = (body, schema) => {
+  const schemaPaths = Object.keys(schema.paths);
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) => schemaPaths.includes(key))
+  );
+};
+
+// Centralized error handling
+const handleError = async (route, method, error, req, res) => {
+  console.error(`${route} error:`, error);
+  await logError(route, method, error.message, error.stack, req.body);
+  res.status(500).json({
+    message: messages.INTERNAL_SERVER_ERROR,
+    error: error.message,
+  });
+};
+
+// @route   POST /admin/offer/register
+// @desc    Register a new offer (Admin Only)
+// @access  PRIVATE (Admin Only)
 router.post(
   "/admin/offer/register",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  upload.single("image"),
-  [...offerValidation()],
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  upload.single("image"), // Handle image upload
+  [...offerValidation()], // Apply offer validation rules
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request body
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = [
-        "name",
-        "description",
-        "categories",
-        "customizations",
-        "offerPrice",
-        "imageUrl",
-        "validFrom",
-        "validUntil",
-        "termsAndConditions",
-        "isActive",
-        "offerCode",
-      ];
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Offer.schema);
 
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
-
+      // Parse customizations if provided
       let customizations = filteredBody.customizations;
-
       if (typeof customizations === "string") {
         try {
           customizations = JSON.parse(customizations);
@@ -66,15 +72,27 @@ router.post(
         }
       }
 
-      let isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-      customizations = customizations.map((id) => id.trim());
-
-      if (!customizations.every(isValidObjectId)) {
-        return res
-          .status(400)
-          .json({ error: "Invalid customization ID(s) provided" });
+      // Validate customization IDs
+      if (customizations) {
+        customizations = customizations.map((id) => id.trim());
+        if (
+          !customizations.every((id) => mongoose.Types.ObjectId.isValid(id))
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid customization ID(s) provided" });
+        }
+        const existingCustomizations = await Customization.find({
+          _id: { $in: customizations },
+        }).lean();
+        if (existingCustomizations.length !== customizations.length) {
+          return res
+            .status(400)
+            .json({ error: "One or more customizations do not exist" });
+        }
       }
 
+      // Parse categories if provided
       let categories = filteredBody.categories;
       if (typeof categories === "string") {
         try {
@@ -86,35 +104,25 @@ router.post(
         }
       }
 
-      isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-      categories = categories.map((id) => id.trim());
-
-      if (!categories.every(isValidObjectId)) {
-        return res
-          .status(400)
-          .json({ error: "Invalid category ID(s) provided" });
+      // Validate category IDs
+      if (categories) {
+        categories = categories.map((id) => id.trim());
+        if (!categories.every((id) => mongoose.Types.ObjectId.isValid(id))) {
+          return res
+            .status(400)
+            .json({ error: "Invalid category ID(s) provided" });
+        }
+        const existingCategories = await Category.find({
+          _id: { $in: categories },
+        }).lean();
+        if (existingCategories.length !== categories.length) {
+          return res
+            .status(400)
+            .json({ error: "One or more categories do not exist" });
+        }
       }
 
-      const existingCategories = await Category.find({
-        _id: { $in: categories },
-      }).lean();
-
-      if (existingCategories.length !== categories.length) {
-        return res
-          .status(400)
-          .json({ error: "One or more categories do not exist" });
-      }
-
-      const existingCustomizations = await Customization.find({
-        _id: { $in: customizations },
-      }).lean();
-
-      if (existingCustomizations.length !== customizations.length) {
-        return res
-          .status(400)
-          .json({ error: "One or more customizations do not exist" });
-      }
-
+      // Check if an offer with the same name already exists
       const existingOffer = await Offer.findOne({
         name: filteredBody.name,
       }).lean();
@@ -124,6 +132,7 @@ router.post(
           .json({ message: "Offer with this name already exists" });
       }
 
+      // Prepare offer data
       let offerData = {
         name: filteredBody.name,
         description: filteredBody.description,
@@ -137,6 +146,7 @@ router.post(
         categories: categories,
       };
 
+      // Upload image to Cloudinary if provided
       if (req.file) {
         const uploadStream = () =>
           new Promise((resolve, reject) => {
@@ -154,51 +164,42 @@ router.post(
         offerData.imageUrl = result.secure_url;
       }
 
+      // Create and save the offer
       const offer = new Offer(offerData);
       await offer.save();
+
+      // Return success response
       res.status(201).json(offer);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/offer/register", "POST", error, req, res);
     }
   }
 );
 
-// PUT /admin/offer/update/:id
-// Access: PRIVATE (Admin Only)
+// @route   PUT /admin/offer/update/:id
+// @desc    Update an existing offer (Admin Only)
+// @access  PRIVATE (Admin Only)
 router.put(
   "/admin/offer/update/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  upload.single("image"),
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  upload.single("image"), // Handle image upload
   [
-    param("id").isMongoId().withMessage("Invalid Offer ID"),
-    ...offerValidation(),
+    param("id").isMongoId().withMessage("Invalid Offer ID"), // Validate offer ID
+    ...offerValidation(), // Apply offer validation rules
   ],
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request body
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = [
-        "name",
-        "description",
-        "categories",
-        "customizations",
-        "offerPrice",
-        "imageUrl",
-        "validFrom",
-        "validUntil",
-        "termsAndConditions",
-        "isActive",
-        "offerCode",
-      ];
+      const { id } = req.params;
 
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Offer.schema);
 
+      // Parse customizations if provided
       let customizations = filteredBody.customizations;
       if (typeof customizations === "string") {
         try {
@@ -209,6 +210,8 @@ router.put(
             .json({ error: "Invalid format for customizations" });
         }
       }
+
+      // Validate customization IDs
       if (customizations) {
         customizations = customizations.map((id) => id.trim());
         if (
@@ -229,6 +232,7 @@ router.put(
         filteredBody.customizations = customizations;
       }
 
+      // Parse categories if provided
       let categories = filteredBody.categories;
       if (typeof categories === "string") {
         try {
@@ -239,6 +243,8 @@ router.put(
             .json({ error: "Invalid format for categories" });
         }
       }
+
+      // Validate category IDs
       if (categories) {
         categories = categories.map((id) => id.trim());
         if (!categories.every((id) => mongoose.Types.ObjectId.isValid(id))) {
@@ -257,13 +263,12 @@ router.put(
         filteredBody.categories = categories;
       }
 
+      // Check if an offer with the same name already exists (excluding the current offer)
       if (filteredBody.name) {
-        console.log(req.params.id);
         const existingOffer = await Offer.findOne({
           name: filteredBody.name,
-          _id: { $ne: req.params.id },
+          _id: { $ne: id },
         }).lean();
-
         if (existingOffer) {
           return res
             .status(400)
@@ -271,6 +276,7 @@ router.put(
         }
       }
 
+      // Upload image to Cloudinary if provided
       if (req.file) {
         const uploadStream = () =>
           new Promise((resolve, reject) => {
@@ -288,34 +294,46 @@ router.put(
         filteredBody.imageUrl = result.secure_url;
       }
 
-      const updatedOffer = await Offer.findByIdAndUpdate(
-        req.params.id,
-        filteredBody,
-        { new: true }
-      );
+      // Update the offer
+      const updatedOffer = await Offer.findByIdAndUpdate(id, filteredBody, {
+        new: true,
+      });
 
       if (!updatedOffer) {
         return res.status(404).json({ error: "Offer not found" });
       }
 
+      // Return success response
       res.status(200).json(updatedOffer);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(
+        `/admin/offer/update/${req.params.id}`,
+        "PUT",
+        error,
+        req,
+        res
+      );
     }
   }
 );
 
-// GET /admin/offer/get/:id
-// Access: PRIVATE
+// @route   GET /admin/offer/get/:id
+// @desc    Get offer details by ID
+// @access  PRIVATE
 router.get(
   "/admin/offer/get/:id",
   authMiddleware.authenticateJWT,
   [param("id").isMongoId().withMessage("Invalid offer ID")],
   async (req, res) => {
     try {
-      if (validateRequest(req, res)) return;
+      // Validate request parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const offer = await Offer.findById(req.params.id)
+      const { id } = req.params;
+
+      // Find the offer by ID and populate related fields
+      const offer = await Offer.findById(id)
         .populate({ path: "categories" })
         .populate({ path: "customizations" })
         .lean();
@@ -323,28 +341,33 @@ router.get(
       if (!offer) {
         return res.status(404).json({ message: "Offer not found" });
       }
+
+      // Return success response
       res.status(200).json(offer);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(`/admin/offer/get/${req.params.id}`, "GET", error, req, res);
     }
   }
 );
 
-// GET /admin/offers
-// Access: PRIVATE
+// @route   GET /admin/offers
+// @desc    Get all offers
+// @access  PRIVATE
 router.get(
   "/admin/offers",
   authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage("Invalid offer ID")],
   async (req, res) => {
     try {
+      // Fetch all offers and populate related fields
       const offers = await Offer.find()
         .populate({ path: "categories" })
         .populate({ path: "customizations" })
         .lean();
+
+      // Return success response
       res.status(200).json(offers);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError("/admin/offers", "GET", error, req, res);
     }
   }
 );

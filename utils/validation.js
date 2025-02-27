@@ -311,6 +311,66 @@ const categoryMessages = {
   },
 };
 
+// Employee Messages-related validation messages
+const employeeMessageMessages = {
+  message: {
+    required: "Message is required",
+  },
+  receiverId: {
+    required: "Receiver is required",
+    invalid: "Invalid Receiver ID format",
+  },
+};
+
+// Notifications-related validation messages
+const notificationMessages = {
+  recipientType: {
+    required: "Recipient type is required",
+    invalid: "Invalid recipient type",
+  },
+  message: {
+    required: "Message is required",
+  },
+  type: {
+    required: "Notification type is required",
+    invalid: "Invalid notification type",
+  },
+  recipientId: {
+    customerRequired: "For Customer notifications, recipientId is required.",
+  },
+  branchId: {
+    branchRequired: "For Branch notifications, branchId is required.",
+  },
+};
+
+// Offer-related validation messages
+const offerMessages = {
+  name: {
+    required: "Offer name is required",
+  },
+  categories: {
+    required: "At least one category is required",
+    invalid: "Categories must be provided as an array",
+  },
+  offerPrice: {
+    required: "Offer price is required",
+    invalid: "Offer price must be a valid number",
+  },
+  validFrom: {
+    required: "Valid from date is required",
+    invalid: "Valid from date must be a valid date",
+  },
+  validUntil: {
+    required: "Valid until date is required",
+    invalid: "Valid until date must be a valid date",
+    invalidDate: "Valid until date must be after valid from date",
+  },
+  offerCode: {
+    required: "Offer code is required",
+    invalid: "Offer code must be a valid string",
+  },
+};
+
 // FoodItem-related validation messages
 const foodItemMessages = {
   foodItem: {
@@ -846,29 +906,36 @@ const employeeValidation = {
 
 // Employee message validation logic
 const employeeMessageValidation = () => [
-  body("message").notEmpty().withMessage("Message is required"),
-  body("receiverId").isMongoId().withMessage("Invalid receiver ID"),
+  body("message")
+    .notEmpty()
+    .withMessage(employeeMessageMessages.message.required),
+  body("receiverId")
+    .isMongoId()
+    .withMessage(employeeMessageMessages.message.invalid),
 ];
 
 // Notification validation logic
 const notificationValidation = () => [
   body("recipientType")
     .notEmpty()
-    .withMessage("Recipient type is required")
+    .withMessage(notificationMessages.recipientType.required)
     .isIn(Object.values(RecipientTypes))
-    .withMessage("Invalid recipient type"),
-  body("message").notEmpty().withMessage("Message is required"),
+    .withMessage(notificationMessages.recipientType.invalid),
+
+  body("message").notEmpty().withMessage(notificationMessages.message.required),
+
   body("type")
     .notEmpty()
-    .withMessage("Notification type is required")
+    .withMessage(notificationMessages.type.required)
     .isIn(Object.values(NotificationTypes))
-    .withMessage("Invalid notification type"),
+    .withMessage(notificationMessages.type.invalid),
+
   body().custom((value) => {
     if (value.recipientType === RecipientTypes.CUSTOMER && !value.recipientId) {
-      throw new Error("For Customer notifications, recipientId is required.");
+      throw new Error(notificationMessages.recipientId.customerRequired);
     }
     if (value.recipientType === RecipientTypes.BRANCH && !value.branchId) {
-      throw new Error("For Branch notifications, branchId is required.");
+      throw new Error(notificationMessages.branchId.branchRequired);
     }
     return true;
   }),
@@ -876,60 +943,43 @@ const notificationValidation = () => [
 
 // Offer validation logic
 const offerValidation = () => [
-  body("name")
-    .isString()
-    .notEmpty()
-    .withMessage("Name is required and must be a string."),
-
-  body("description")
-    .optional()
-    .isString()
-    .withMessage("Description must be a string."),
-
-  body("customizations")
-    .optional()
-    .notEmpty()
-    .withMessage("Customizations must be an array of ObjectIds."),
+  body("name").notEmpty().withMessage(offerMessages.name.required),
 
   body("categories")
     .notEmpty()
-    .withMessage("Categories must be an array of ObjectIds."),
+    .withMessage(offerMessages.categories.required)
+    .isArray({ min: 1 })
+    .withMessage(offerMessages.categories.invalid),
 
   body("offerPrice")
-    .isFloat({ min: 0 })
-    .withMessage("Offer price is required and must be a non-negative number."),
-
-  body("imageUrl")
-    .optional()
-    .isString()
-    .withMessage("Image URL must be a string."),
+    .notEmpty()
+    .withMessage(offerMessages.offerPrice.required)
+    .isNumeric()
+    .withMessage(offerMessages.offerPrice.invalid),
 
   body("validFrom")
+    .notEmpty()
+    .withMessage(offerMessages.validFrom.required)
     .isISO8601()
-    .withMessage(
-      "Valid from date is required and must be a valid ISO 8601 date."
-    ),
+    .withMessage(offerMessages.validFrom.invalid),
 
   body("validUntil")
+    .notEmpty()
+    .withMessage(offerMessages.validUntil.required)
     .isISO8601()
-    .withMessage(
-      "Valid until date is required and must be a valid ISO 8601 date."
-    ),
-
-  body("termsAndConditions")
-    .optional()
-    .isString()
-    .withMessage("Terms and conditions must be a string."),
-
-  body("isActive")
-    .optional()
-    .isBoolean()
-    .withMessage("isActive must be a boolean value."),
+    .withMessage(offerMessages.validUntil.invalid)
+    .custom((value, { req }) => {
+      if (new Date(value) <= new Date(req.body.validFrom)) {
+        throw new Error(offerMessages.validUntil.invalidDate);
+      }
+      return true;
+    }),
 
   body("offerCode")
-    .isString()
     .notEmpty()
-    .withMessage("Offer code is required and must be a string."),
+    .withMessage(offerMessages.offerCode.required)
+    .isString()
+    .withMessage(offerMessages.offerCode.invalid),
 ];
 
 // Customization validation logic
