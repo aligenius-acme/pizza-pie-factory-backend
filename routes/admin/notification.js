@@ -5,7 +5,8 @@ const Customer = require("../../models/Customer");
 const authMiddleware = require("../../middleware/auth");
 const { RecipientTypes, NotificationTypes } = require("../../utils/enums");
 const { notificationValidation } = require("../../utils/validation");
-const { sendEmail, sendSms } = require("../../utils/notifications");
+const { sendEmail } = require("../../utils/email");
+const { sendSms } = require("../../utils/sms");
 const { stripUnwantedFields, handleError } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 

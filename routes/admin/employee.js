@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const Employee = require("../../models/Employee");
 const Branch = require("../../models/Branch");
 const authMiddleware = require("../../middleware/auth");

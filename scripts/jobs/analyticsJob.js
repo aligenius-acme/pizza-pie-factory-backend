@@ -13,15 +13,12 @@ async function updateAnalytics() {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Group orders by branchId
+    // Group orders by branchId for today's data
     const ordersByBranch = await Order.aggregate([
       {
         $match: {
           createdAt: { $gte: startOfDay, $lte: endOfDay },
         },
-      },
-      {
-        $unwind: "$items", // Flatten the items array to process each item individually
       },
       {
         $group: {
@@ -56,9 +53,6 @@ async function updateAnalytics() {
               ],
             },
           },
-          foodItemSales: {
-            $push: { foodItem: "$items.foodItem", quantity: "$items.quantity" },
-          },
         },
       },
       {
@@ -66,7 +60,7 @@ async function updateAnalytics() {
           branchId: "$_id",
           totalOrdersToday: 1,
           totalRevenueToday: 1,
-          averagePreparationTime: {
+          averagePreparationTimeToday: {
             $avg: {
               $filter: {
                 input: "$preparationTimes",
@@ -75,7 +69,7 @@ async function updateAnalytics() {
               },
             },
           },
-          averageDeliveryTime: {
+          averageDeliveryTimeToday: {
             $avg: {
               $filter: {
                 input: "$deliveryTimes",
@@ -84,47 +78,98 @@ async function updateAnalytics() {
               },
             },
           },
-          foodItemSales: 1,
         },
       },
     ]);
 
-    if (ordersByBranch.length === 0) {
-      console.log("⚠️ No orders found for today.");
-      return;
-    }
+    // Group orders by branchId for all-time data
+    const allTimeOrdersByBranch = await Order.aggregate([
+      {
+        $group: {
+          _id: "$branchId",
+          totalOrdersAllTime: { $sum: 1 },
+          totalRevenueAllTime: { $sum: "$totalAmount" },
+          preparationTimes: {
+            $push: {
+              $cond: [
+                { $ifNull: ["$preparedAt", false] },
+                {
+                  $divide: [
+                    { $subtract: ["$preparedAt", "$createdAt"] },
+                    60000,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          deliveryTimes: {
+            $push: {
+              $cond: [
+                { $ifNull: ["$deliveredAt", false] },
+                {
+                  $divide: [
+                    { $subtract: ["$deliveredAt", "$preparedAt"] },
+                    60000,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          branchId: "$_id",
+          totalOrdersAllTime: 1,
+          totalRevenueAllTime: 1,
+          averagePreparationTimeAllTime: {
+            $avg: {
+              $filter: {
+                input: "$preparationTimes",
+                as: "prepTime",
+                cond: { $ne: ["$$prepTime", null] },
+              },
+            },
+          },
+          averageDeliveryTimeAllTime: {
+            $avg: {
+              $filter: {
+                input: "$deliveryTimes",
+                as: "delTime",
+                cond: { $ne: ["$$delTime", null] },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    // Merge data and update analytics
+    const branchDataMap = new Map();
+    allTimeOrdersByBranch.forEach((branch) => {
+      branchDataMap.set(branch.branchId.toString(), branch);
+    });
 
     for (const branchData of ordersByBranch) {
-      // Aggregate to get the top 10 best-selling food items for the branch
-      const topFoodItems = await Order.aggregate([
-        {
-          $match: {
-            branchId: branchData.branchId,
-            createdAt: { $gte: startOfDay, $lte: endOfDay },
-          },
-        },
-        { $unwind: "$items" },
-        {
-          $group: {
-            _id: "$items.foodItem",
-            totalQuantity: { $sum: "$items.quantity" },
-          },
-        },
-        { $sort: { totalQuantity: -1 } },
-        { $limit: 10 },
-        { $project: { _id: 1 } },
-      ]);
-
-      const topFoodItemIds = topFoodItems.map((item) => item._id);
+      const allTimeData =
+        branchDataMap.get(branchData.branchId.toString()) || {};
 
       await Analytics.findOneAndUpdate(
         { branchId: branchData.branchId },
         {
-          averagePreparationTime: branchData.averagePreparationTime || 0,
-          averageDeliveryTime: branchData.averageDeliveryTime || 0,
           totalOrdersToday: branchData.totalOrdersToday,
           totalRevenueToday: branchData.totalRevenueToday,
-          topFoodItems: topFoodItemIds,
+          averagePreparationTimeToday:
+            branchData.averagePreparationTimeToday || 0,
+          averageDeliveryTimeToday: branchData.averageDeliveryTimeToday || 0,
+          totalOrdersAllTime: allTimeData.totalOrdersAllTime || 0,
+          totalRevenueAllTime: allTimeData.totalRevenueAllTime || 0,
+          averagePreparationTimeAllTime:
+            allTimeData.averagePreparationTimeAllTime || 0,
+          averageDeliveryTimeAllTime:
+            allTimeData.averageDeliveryTimeAllTime || 0,
           lastUpdated: new Date(),
         },
         { upsert: true, new: true }
