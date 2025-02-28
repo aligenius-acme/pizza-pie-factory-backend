@@ -32,6 +32,8 @@ const EmployeeSchema = new Schema(
     },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpiry: { type: Date, select: false },
+    otp: { type: String, select: false }, // Store OTP
+    otpExpiry: { type: Date, select: false }, // OTP expiry time
     isActive: { type: Boolean, default: false, select: false },
   },
   { timestamps: true }

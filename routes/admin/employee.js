@@ -6,6 +6,7 @@ const Employee = require("../../models/Employee");
 const Branch = require("../../models/Branch");
 const authMiddleware = require("../../middleware/auth");
 const { sendEmail } = require("../../utils/email");
+const { sendSms } = require("../../utils/sms");
 const { employeeValidation } = require("../../utils/validation");
 const {
   generateToken,
@@ -13,6 +14,7 @@ const {
   hashPassword,
   stripUnwantedFields,
   handleError,
+  generateOTP,
 } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 require("dotenv").config();
@@ -151,8 +153,10 @@ router.post(
 
       const { email, password } = req.body;
 
-      // Find the employee by email
-      const employee = await Employee.findOne({ email }).lean();
+      // Find the employee by email (without .lean())
+      const employee = await Employee.findOne({ email }).select(
+        "+otp +otpExpiry"
+      );
       if (!employee) {
         return res.status(400).json({ message: messages.EMPLOYEE_NOT_FOUND });
       }
@@ -168,16 +172,66 @@ router.post(
         return res.status(400).json({ message: messages.INVALID_CREDENTIALS });
       }
 
-      // Return success response with JWT token
+      // Generate and send OTP
+      const otp = generateOTP();
+      const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // OTP expires in 5 minutes
+
+      // Save OTP and expiry time to the employee document
+      employee.otp = otp;
+      employee.otpExpiry = otpExpiry;
+      await employee.save(); // Now this will work
+
+      // Generate the OTP message using the OTP_MESSAGE function
+      const otpMessage = messages.OTP_MESSAGE(otp, 5); // 5 minutes expiry
+
+      // Send OTP via SMS
+      await sendSms(employee.phone, otpMessage);
+
+      // Return success response (OTP sent)
       res.status(200).json({
-        message: messages.LOGIN_SUCCESS,
-        token: generateToken(employee._id, { role: employee.role }),
+        message: messages.OTP_SENT,
+        phone: employee.phone, // Return phone number for reference
       });
     } catch (error) {
       handleError("/admin/employee/login", "POST", error, req, res);
     }
   }
 );
+
+// @route   POST /admin/employee/verify-otp
+// @desc    Verify otp form MFA
+// @access  PUBLIC
+router.post("/admin/employee/verify-otp", async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    // Find the employee by phone number
+    const employee = await Employee.findOne({ phone }).select(
+      "+otp +otpExpiry"
+    );
+    if (!employee) {
+      return res.status(400).json({ message: messages.EMPLOYEE_NOT_FOUND });
+    }
+
+    // Check if OTP matches and is not expired
+    if (employee.otp !== otp || employee.otpExpiry < new Date()) {
+      return res.status(400).json({ message: messages.INVALID_OTP });
+    }
+
+    // Clear OTP and expiry time after successful verification
+    employee.otp = undefined;
+    employee.otpExpiry = undefined;
+    await employee.save();
+
+    // Return success response with JWT token
+    res.status(200).json({
+      message: messages.LOGIN_SUCCESS,
+      token: generateToken(employee._id, { role: employee.role }),
+    });
+  } catch (error) {
+    handleError("/admin/employee/verify-otp", "POST", error, req, res);
+  }
+});
 
 // @route   GET /admin/employee/get/:id
 // @desc    Get an employee's details by ID

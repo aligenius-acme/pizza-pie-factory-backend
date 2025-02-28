@@ -99,4 +99,10 @@ module.exports = {
   INVALID_CATEGORY_FORMAT: "Invalid format for categories",
   FOODITEM_REGISTRATION_SUCCESS: "Food item registered successfully",
   FOODITEM_UPDATE_SUCCESS: "Food item updated successfully",
+
+  // OTP messages
+  OTP_SENT: "OTP sent successfully. Please check your phone.",
+  INVALID_OTP: "Invalid OTP or OTP has expired.",
+  OTP_MESSAGE: (otp, expiry) =>
+    `Your OTP for login is: ${otp}. It will expire in ${expiry} minutes.`,
 };

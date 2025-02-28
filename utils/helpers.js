@@ -1,7 +1,9 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { validationResult } = require("express-validator");
-
+const messages = require("../utils/messages");
+const crypto = require("crypto");
+const ErrorLog = require("../models/ErrorLog");
 const { JWT_SECRET, JWT_EXPIRY } = process.env;
 
 /** Generate JWT Token */
@@ -94,6 +96,10 @@ const stripUnwantedFields = (body, schema) => {
   );
 };
 
+const generateOTP = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
+
 // Centralized error handling
 const handleError = async (route, method, error, req, res) => {
   console.error(`${route} error:`, error);
@@ -111,4 +117,5 @@ module.exports = {
   isWithinDeliveryRadius,
   stripUnwantedFields,
   handleError,
+  generateOTP,
 };
