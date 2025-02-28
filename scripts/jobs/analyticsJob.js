@@ -3,6 +3,14 @@ const mongoose = require("mongoose");
 const Order = require("../../models/Order");
 const Analytics = require("../../models/Analytics");
 
+// Helper function to calculate percentage change
+function calculatePercentageChange(current, previous) {
+  if (previous === 0 || previous === null || previous === undefined) {
+    return 0; // Avoid division by zero or invalid previous values
+  }
+  return ((current - previous) / previous) * 100;
+}
+
 async function updateAnalytics() {
   try {
     console.log("⏳ Running Analytics Job...");
@@ -534,6 +542,82 @@ async function updateAnalytics() {
       const topFoodItems =
         topFoodItemsMap.get(branchData.branchId.toString()) || [];
 
+      // Calculate percentage changes
+      const percentageChangeOrdersPreviousDay = calculatePercentageChange(
+        branchData.totalOrdersToday,
+        previousDayData.totalOrdersPreviousDay
+      );
+      const percentageChangeRevenuePreviousDay = calculatePercentageChange(
+        branchData.totalRevenueToday,
+        previousDayData.totalRevenuePreviousDay
+      );
+      const percentageChangePreparationTimePreviousDay =
+        calculatePercentageChange(
+          branchData.averagePreparationTimeToday,
+          previousDayData.averagePreparationTimePreviousDay
+        );
+      const percentageChangeDeliveryTimePreviousDay = calculatePercentageChange(
+        branchData.averageDeliveryTimeToday,
+        previousDayData.averageDeliveryTimePreviousDay
+      );
+
+      const percentageChangeOrdersPreviousWeek = calculatePercentageChange(
+        branchData.totalOrdersToday,
+        previousWeekData.totalOrdersPreviousWeek
+      );
+      const percentageChangeRevenuePreviousWeek = calculatePercentageChange(
+        branchData.totalRevenueToday,
+        previousWeekData.totalRevenuePreviousWeek
+      );
+      const percentageChangePreparationTimePreviousWeek =
+        calculatePercentageChange(
+          branchData.averagePreparationTimeToday,
+          previousWeekData.averagePreparationTimePreviousWeek
+        );
+      const percentageChangeDeliveryTimePreviousWeek =
+        calculatePercentageChange(
+          branchData.averageDeliveryTimeToday,
+          previousWeekData.averageDeliveryTimePreviousWeek
+        );
+
+      const percentageChangeOrdersPreviousMonth = calculatePercentageChange(
+        branchData.totalOrdersToday,
+        previousMonthData.totalOrdersPreviousMonth
+      );
+      const percentageChangeRevenuePreviousMonth = calculatePercentageChange(
+        branchData.totalRevenueToday,
+        previousMonthData.totalRevenuePreviousMonth
+      );
+      const percentageChangePreparationTimePreviousMonth =
+        calculatePercentageChange(
+          branchData.averagePreparationTimeToday,
+          previousMonthData.averagePreparationTimePreviousMonth
+        );
+      const percentageChangeDeliveryTimePreviousMonth =
+        calculatePercentageChange(
+          branchData.averageDeliveryTimeToday,
+          previousMonthData.averageDeliveryTimePreviousMonth
+        );
+
+      const percentageChangeOrdersPreviousYear = calculatePercentageChange(
+        branchData.totalOrdersToday,
+        previousYearData.totalOrdersPreviousYear
+      );
+      const percentageChangeRevenuePreviousYear = calculatePercentageChange(
+        branchData.totalRevenueToday,
+        previousYearData.totalRevenuePreviousYear
+      );
+      const percentageChangePreparationTimePreviousYear =
+        calculatePercentageChange(
+          branchData.averagePreparationTimeToday,
+          previousYearData.averagePreparationTimePreviousYear
+        );
+      const percentageChangeDeliveryTimePreviousYear =
+        calculatePercentageChange(
+          branchData.averageDeliveryTimeToday,
+          previousYearData.averageDeliveryTimePreviousYear
+        );
+
       await Analytics.findOneAndUpdate(
         { branchId: branchData.branchId },
         {
@@ -578,6 +662,22 @@ async function updateAnalytics() {
             previousYearData.averagePreparationTimePreviousYear || 0,
           averageDeliveryTimePreviousYear:
             previousYearData.averageDeliveryTimePreviousYear || 0,
+          percentageChangeOrdersPreviousDay,
+          percentageChangeRevenuePreviousDay,
+          percentageChangePreparationTimePreviousDay,
+          percentageChangeDeliveryTimePreviousDay,
+          percentageChangeOrdersPreviousWeek,
+          percentageChangeRevenuePreviousWeek,
+          percentageChangePreparationTimePreviousWeek,
+          percentageChangeDeliveryTimePreviousWeek,
+          percentageChangeOrdersPreviousMonth,
+          percentageChangeRevenuePreviousMonth,
+          percentageChangePreparationTimePreviousMonth,
+          percentageChangeDeliveryTimePreviousMonth,
+          percentageChangeOrdersPreviousYear,
+          percentageChangeRevenuePreviousYear,
+          percentageChangePreparationTimePreviousYear,
+          percentageChangeDeliveryTimePreviousYear,
           topFoodItems: topFoodItems, // Now includes count
           lastUpdated: new Date(),
         },
