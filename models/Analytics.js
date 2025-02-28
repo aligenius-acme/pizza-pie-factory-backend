@@ -20,6 +20,14 @@ const AnalyticsSchema = new Schema(
       min: 0,
       default: 0,
     },
+    totalOrdersAllTime: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      default: 0,
+    },
+    totalRevenueAllTime: { type: Number, required: true, min: 0, default: 0 },
     averagePreparationTimeToday: {
       type: Number,
       required: true,
@@ -32,17 +40,18 @@ const AnalyticsSchema = new Schema(
       min: 0,
       default: 0,
     },
-    totalOrdersAllTime: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
-      default: 0,
-    },
-    totalRevenueAllTime: { type: Number, required: true, min: 0, default: 0 },
     totalOrdersToday: { type: Number, required: true, min: 0, default: 0 },
     totalRevenueToday: { type: Number, required: true, min: 0, default: 0 },
-    topFoodItems: [{ type: Schema.Types.ObjectId, ref: "FoodItem" }],
+    topFoodItems: [
+      {
+        foodItem: {
+          type: Schema.Types.ObjectId,
+          ref: "FoodItem",
+          required: true,
+        },
+        count: { type: Number, default: 0 },
+      },
+    ],
     lastUpdated: { type: Date, default: Date.now },
   },
   { timestamps: true }

@@ -146,15 +146,55 @@ async function updateAnalytics() {
       },
     ]);
 
+    // Get the top 5 ordered food items per branch with count
+    const topFoodItemsByBranch = await Order.aggregate([
+      {
+        $unwind: "$items",
+      },
+      {
+        $group: {
+          _id: { branchId: "$branchId", foodItem: "$items.foodItem" },
+          orderCount: { $sum: "$items.quantity" },
+        },
+      },
+      {
+        $sort: { orderCount: -1 },
+      },
+      {
+        $group: {
+          _id: "$_id.branchId",
+          topFoodItems: {
+            $push: {
+              foodItem: "$_id.foodItem",
+              count: "$orderCount",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          branchId: "$_id",
+          topFoodItems: { $slice: ["$topFoodItems", 5] }, // Limit to top 5
+        },
+      },
+    ]);
+
     // Merge data and update analytics
     const branchDataMap = new Map();
     allTimeOrdersByBranch.forEach((branch) => {
       branchDataMap.set(branch.branchId.toString(), branch);
     });
 
+    const topFoodItemsMap = new Map();
+    topFoodItemsByBranch.forEach((branch) => {
+      topFoodItemsMap.set(branch.branchId.toString(), branch.topFoodItems);
+    });
+
     for (const branchData of ordersByBranch) {
       const allTimeData =
         branchDataMap.get(branchData.branchId.toString()) || {};
+      const topFoodItems =
+        topFoodItemsMap.get(branchData.branchId.toString()) || [];
 
       await Analytics.findOneAndUpdate(
         { branchId: branchData.branchId },
@@ -170,6 +210,7 @@ async function updateAnalytics() {
             allTimeData.averagePreparationTimeAllTime || 0,
           averageDeliveryTimeAllTime:
             allTimeData.averageDeliveryTimeAllTime || 0,
+          topFoodItems: topFoodItems, // Now includes count
           lastUpdated: new Date(),
         },
         { upsert: true, new: true }
