@@ -1,10 +1,14 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const axios = require("axios");
 const { validationResult } = require("express-validator");
 const messages = require("../utils/messages");
 const crypto = require("crypto");
 const ErrorLog = require("../models/ErrorLog");
 const { JWT_SECRET, JWT_EXPIRY } = process.env;
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Must be 32 bytes for AES-256
+const IV_LENGTH = 16; // For AES, this is always 16
 
 /** Generate JWT Token */
 const generateToken = (id, additionalData = {}) =>
@@ -110,6 +114,95 @@ const handleError = async (route, method, error, req, res) => {
   });
 };
 
+// Helper function to validate time format (HH:MM)
+const isValidTime = (time) => {
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  return timeRegex.test(time);
+};
+
+// Helper function to validate openingTimings
+const validateOpeningTimings = (openingTimings) => {
+  const days = new Set(); // To track unique days
+
+  for (const timing of openingTimings) {
+    // Check if the day is valid
+    if (!Object.values(BranchOpeningDays).includes(timing.day)) {
+      throw new Error(messages.INVALID_DAY);
+    }
+
+    // Check if the day is unique
+    if (days.has(timing.day)) {
+      throw new Error(messages.DUPLICATE_DAY);
+    }
+    days.add(timing.day);
+
+    // Check if openingTime and closingTime are valid
+    if (!isValidTime(timing.openingTime)) {
+      throw new Error(messages.INVALID_TIME_FORMAT);
+    }
+    if (!isValidTime(timing.closingTime)) {
+      throw new Error(messages.INVALID_TIME_FORMAT);
+    }
+
+    // Check if closingTime is after openingTime
+    const opening = new Date(`1970-01-01T${timing.openingTime}:00`);
+    const closing = new Date(`1970-01-01T${timing.closingTime}:00`);
+    if (closing <= opening) {
+      throw new Error(messages.CLOSING_BEFORE_OPENING);
+    }
+  }
+};
+
+// Helper function to validate pickup time against branch opening timings
+const validatePickupTime = (branch, pickupDay, pickupTime) => {
+  // Find the branch's opening timings for the selected day
+  const openingTiming = branch.openingTimings.find(
+    (timing) => timing.day === pickupDay
+  );
+
+  if (!openingTiming) {
+    throw new Error(messages.BRANCH_CLOSED);
+  }
+
+  // Convert opening and closing times to Date objects for comparison
+  const opening = new Date(`1970-01-01T${openingTiming.openingTime}:00`);
+  const closing = new Date(`1970-01-01T${openingTiming.closingTime}:00`);
+  const selectedTime = new Date(`1970-01-01T${pickupTime}:00`);
+
+  // Check if the selected pickup time is within the branch's opening hours
+  if (selectedTime < opening || selectedTime > closing) {
+    throw new Error(messages.PICKUP_TIME_OUTSIDE_HOURS);
+  }
+};
+
+// Encrypt text
+function encrypt(text) {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY),
+    iv
+  );
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return `${iv.toString("hex")}:${encrypted.toString("hex")}`;
+}
+
+// Decrypt text
+function decrypt(text) {
+  const [ivHex, encryptedHex] = text.split(":");
+  const iv = Buffer.from(ivHex, "hex");
+  const encrypted = Buffer.from(encryptedHex, "hex");
+  const decipher = crypto.createDecipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY),
+    iv
+  );
+  let decrypted = decipher.update(encrypted);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
+
 module.exports = {
   generateToken,
   validateRequest,
@@ -118,4 +211,9 @@ module.exports = {
   stripUnwantedFields,
   handleError,
   generateOTP,
+  isValidTime,
+  validateOpeningTimings,
+  validatePickupTime,
+  encrypt,
+  decrypt,
 };

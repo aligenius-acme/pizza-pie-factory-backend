@@ -21,6 +21,7 @@ const OrderStatusses = Object.freeze({
   NEW_ORDER: "New Order Received",
   CANCELLED: "Cancelled",
   NOT_DELIVERED: "Not Delivered",
+  PENDING_PAYMENT: "Pending Payment",
 });
 
 const Roles = Object.freeze({
@@ -47,7 +48,7 @@ const OfferDiscountTypes = Object.freeze({
   FIXED_AMOUNT: "Fixed Amount",
 });
 
-const OfferApplicableDays = Object.freeze({
+const BranchOpeningDays = Object.freeze({
   MONDAY: "Monday",
   TUESDAY: "Tuesday",
   WEDNESDAY: "Wednesday",
@@ -67,5 +68,5 @@ module.exports = {
   RecipientTypes,
   NotificationTypes,
   OfferDiscountTypes,
-  OfferApplicableDays,
+  BranchOpeningDays,
 };

@@ -2,6 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
+const Customer = require("../models/Customer");
 const Branch = require("../models/Branch");
 const authMiddleware = require("../middleware/auth");
 const {
@@ -9,14 +10,31 @@ const {
   DeliveryTypes,
   RecipientTypes,
   NotificationTypes,
+  PaymentTypes,
 } = require("../utils/enums");
 const { orderValidation } = require("../utils/validation");
-const { validateRequest, isWithinDeliveryRadius } = require("../utils/helpers");
-const messages = require("../utils/messages"); // Import messages
+const {
+  validateRequest,
+  isWithinDeliveryRadius,
+  stripUnwantedFields,
+  handleError,
+  validatePickupTime,
+  encrypt,
+  decrypt,
+} = require("../utils/helpers");
+const messages = require("../utils/messages");
 
 const router = express.Router();
 
 const BACKEND_URL = process.env.BACKEND_URL;
+const ADCB_MERCHANT_ID = process.env.ADCB_MERCHANT_ID;
+const ADCB_API_KEY = process.env.ADCB_API_KEY;
+const ADCB_PAYMENT_GATEWAY_URL = process.env.ADCB_PAYMENT_GATEWAY_URL;
+const ADCB_RETURN_URL = process.env.ADCB_RETURN_URL;
+
+// Reward points configuration
+const REWARD_POINTS_PER_AED = 1; // 1 point for every AED spent
+const REWARD_POINTS_EXPIRY_DAYS = 365; // Points expire after 1 year
 
 // @route   POST /order/create
 // @desc    Create an order from the cart and delete the cart
@@ -28,30 +46,18 @@ router.post(
   async (req, res) => {
     try {
       // Validate request body
-      if (validateRequest(req, res)) return;
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      const allowedFields = [
-        "customerId",
-        "branchId",
-        "totalAmount",
-        "paymentMethod",
-        "deliveryType",
-        "deliveryAddress",
-        "instructions",
-      ];
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Order.schema);
 
-      // Filter request body to only include allowed fields
-      let filteredBody = Object.fromEntries(
-        Object.entries(req.body).filter(
-          ([key, value]) =>
-            allowedFields.includes(key) && value !== undefined && value !== null
-        )
-      );
+      // Ensure the customer is updating their own order
+      if (filteredBody.customerId !== req.user.id) {
+        return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
+      }
 
       // Find the customer's cart
-      if (filteredBody.customerId != req.user.id) {
-        return res.status(404).json({ message: messages.UNAUTHORIZED_ACCESS });
-      }
       const cart = await Cart.findOne({ customerId: filteredBody.customerId });
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
@@ -78,6 +84,14 @@ router.post(
           .json({ message: messages.DELIVERY_NOT_AVAILABLE });
       }
 
+      // Validate pickup time for PICKUP orders
+      if (filteredBody.deliveryType === DeliveryTypes.PICKUP) {
+        const { pickupDay, pickupTime } = filteredBody;
+
+        // Validate pickup time against branch opening timings
+        validatePickupTime(branch, pickupDay, pickupTime);
+      }
+
       // Create the order
       const newOrder = new Order({
         customerId: filteredBody.customerId,
@@ -85,28 +99,92 @@ router.post(
         items: cart.items,
         offers: cart.offers,
         totalAmount: cart.totalAmount,
-        status: OrderStatusses.PREPARING, // Default status
+        status: OrderStatusses.PENDING_PAYMENT, // Default status for credit card payments
         paymentMethod: filteredBody.paymentMethod,
         deliveryType: filteredBody.deliveryType,
         deliveryAddress:
           filteredBody.deliveryType === DeliveryTypes.DELIVERY
             ? filteredBody.deliveryAddress
             : null,
+        pickupDay:
+          filteredBody.deliveryType === DeliveryTypes.PICKUP
+            ? filteredBody.pickupDay
+            : null,
+        pickupTime:
+          filteredBody.deliveryType === DeliveryTypes.PICKUP
+            ? filteredBody.pickupTime
+            : null,
+        phoneNumber: customer.phoneNumber,
         instructions: filteredBody.instructions,
         statusHistory: [
           {
-            status: OrderStatusses.PREPARING,
+            status: OrderStatusses.PENDING_PAYMENT,
             timestamp: new Date(),
           },
         ],
         orderPlacedAt: new Date(),
       });
 
-      // Save the order
+      // Save the order (temporarily)
+      await newOrder.save();
+
+      // If payment method is Credit Card, redirect to ADCB payment page
+      if (filteredBody.paymentMethod === PaymentTypes.CREDIT_CARD) {
+        // Find the customer
+        const customer = await Customer.findById(filteredBody.customerId);
+
+        // Check if the customer has a saved card
+        const savedCard = customer.paymentMethods.find(
+          (method) =>
+            method.paymentType === PaymentTypes.CREDIT_CARD &&
+            method.saveForFuture
+        );
+
+        // Prepare payment data
+        const paymentData = {
+          merchantId: ADCB_MERCHANT_ID,
+          apiKey: ADCB_API_KEY,
+          amount: cart.totalAmount,
+          orderId: newOrder._id.toString(),
+          returnUrl: ADCB_RETURN_URL,
+          customerEmail: req.user.email, // Assuming email is available in the user object
+        };
+
+        // Add stored card token if available
+        if (savedCard && savedCard.storedCardToken) {
+          // Decrypt the stored card token
+          const decryptedToken = decrypt(savedCard.storedCardToken);
+          paymentData.storedCardToken = decryptedToken;
+        }
+
+        // Redirect to ADCB payment page
+        const paymentUrl = `${ADCB_PAYMENT_GATEWAY_URL}/payment?${new URLSearchParams(
+          paymentData
+        ).toString()}`;
+        return res.status(200).json({
+          message: messages.REDIRECT_TO_PAYMENT,
+          paymentUrl,
+        });
+      }
+
+      // For other payment methods (e.g., Cash), complete the order
+      newOrder.status = OrderStatusses.PREPARING;
       await newOrder.save();
 
       // Delete the cart after successful order creation
       await Cart.deleteMany({ customerId: filteredBody.customerId });
+
+      // Add reward points to the customer
+      const customer = await Customer.findById(filteredBody.customerId);
+      const pointsEarned = Math.floor(cart.totalAmount * REWARD_POINTS_PER_AED);
+      customer.rewardPoints += pointsEarned;
+
+      // Set reward points expiry date (1 year from now)
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + REWARD_POINTS_EXPIRY_DAYS);
+      customer.rewardPointsExpiry = expiryDate;
+
+      await customer.save();
 
       const token = req.headers.authorization?.split(" ")[1]; // Extract the token
 
@@ -115,11 +193,11 @@ router.post(
         `${BACKEND_URL}/api/admin/notification/create`,
         {
           recipientId: filteredBody.customerId,
-          recipientType: RecipientTypes.CUSTOMER, // Ensure this is correctly defined
+          recipientType: RecipientTypes.CUSTOMER,
           message: messages.NOTIFICATION_CUSTOMER_ORDER_CREATED.message(
             newOrder._id
           ),
-          type: NotificationTypes.NEW_ORDER, // Ensure this is correctly defined
+          type: NotificationTypes.NEW_ORDER,
           relatedOrderId: newOrder._id,
         },
         {
@@ -135,9 +213,9 @@ router.post(
         `${BACKEND_URL}/api/admin/notification/create`,
         {
           recipientId: filteredBody.branchId,
-          recipientType: RecipientTypes.BRANCH, // Ensure this is correctly defined
+          recipientType: RecipientTypes.BRANCH,
           message: messages.NOTIFICATION_BRANCH_NEW_ORDER.message(newOrder._id),
-          type: NotificationTypes.ORDER_UPDATE, // Ensure this is correctly defined
+          type: NotificationTypes.ORDER_UPDATE,
           relatedOrderId: newOrder._id,
           branchId: filteredBody.branchId,
         },
@@ -153,27 +231,192 @@ router.post(
       res.status(201).json({
         message: messages.ORDER_CREATED_SUCCESS,
         order: newOrder,
+        pointsEarned,
+        totalRewardPoints: customer.rewardPoints,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Order creation error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/order/create",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        success: false,
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/order/create", "POST", error, req, res);
     }
   }
 );
+
+// @route   POST /payment/callback
+// @desc    Handle payment callback from ADCB
+// @access  PUBLIC
+router.post("/order/payment/callback", async (req, res) => {
+  try {
+    const { orderId, status, paymentToken, saveForFuture } = req.body;
+
+    // Find the order
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: messages.ORDER_NOT_FOUND });
+    }
+
+    // Check payment status
+    if (status === "SUCCESS") {
+      // Update order status
+      order.status = OrderStatusses.PREPARING;
+      await order.save();
+
+      // Save the payment token for future purchases if requested
+      if (saveForFuture) {
+        const customer = await Customer.findById(order.customerId);
+        const existingPaymentMethod = customer.paymentMethods.find(
+          (method) =>
+            method.paymentType === PaymentTypes.CREDIT_CARD &&
+            method.saveForFuture
+        );
+
+        if (existingPaymentMethod) {
+          // Update existing saved card
+          existingPaymentMethod.storedCardToken = encrypt(paymentToken); // Encrypt the token
+        } else {
+          // Add new saved card
+          customer.paymentMethods.push({
+            paymentType: PaymentTypes.CREDIT_CARD,
+            storedCardToken: encrypt(paymentToken), // Encrypt the token
+            saveForFuture: true,
+          });
+        }
+
+        await customer.save();
+      }
+
+      // Delete the cart
+      await Cart.deleteMany({ customerId: order.customerId });
+
+      // Add reward points to the customer
+      const customer = await Customer.findById(order.customerId);
+      const pointsEarned = Math.floor(
+        order.totalAmount * REWARD_POINTS_PER_AED
+      );
+      customer.rewardPoints += pointsEarned;
+
+      // Set reward points expiry date (1 year from now)
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + REWARD_POINTS_EXPIRY_DAYS);
+      customer.rewardPointsExpiry = expiryDate;
+
+      await customer.save();
+
+      // Send notification to the customer
+      const token = req.headers.authorization?.split(" ")[1]; // Extract the token
+      await axios.post(
+        `${BACKEND_URL}/api/admin/notification/create`,
+        {
+          recipientId: order.customerId,
+          recipientType: RecipientTypes.CUSTOMER,
+          message: messages.NOTIFICATION_CUSTOMER_ORDER_CREATED.message(
+            order._id
+          ),
+          type: NotificationTypes.NEW_ORDER,
+          relatedOrderId: order._id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Send notification to the branch
+      await axios.post(
+        `${BACKEND_URL}/api/admin/notification/create`,
+        {
+          recipientId: order.branchId,
+          recipientType: RecipientTypes.BRANCH,
+          message: messages.NOTIFICATION_BRANCH_NEW_ORDER.message(order._id),
+          type: NotificationTypes.ORDER_UPDATE,
+          relatedOrderId: order._id,
+          branchId: order.branchId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Return success response
+      return res.status(200).json({
+        message: messages.PAYMENT_SUCCESS,
+        order,
+        pointsEarned,
+        totalRewardPoints: customer.rewardPoints,
+      });
+    } else {
+      // Payment failed
+      order.status = OrderStatusses.PAYMENT_FAILED;
+      await order.save();
+
+      return res.status(400).json({
+        message: messages.PAYMENT_FAILED,
+      });
+    }
+  } catch (error) {
+    handleError("/payment/callback", "POST", error, req, res);
+  }
+});
+
+// @route   GET /order/track
+// @desc    Track an order using phone number or order ID
+// @access  PUBLIC
+router.get("/order/track", async (req, res) => {
+  try {
+    const { phoneNumber, orderId } = req.query;
+
+    // Validate request: At least one of phoneNumber or orderId is required
+    if (!phoneNumber && !orderId) {
+      return res.status(400).json({
+        message: messages.PHONE_NUMBER_OR_ORDER_ID_REQUIRED,
+      });
+    }
+
+    let order;
+
+    // Find order by phone number
+    if (phoneNumber) {
+      order = await Order.findOne({ phoneNumber }).sort({ orderPlacedAt: -1 }); // Get the latest order for the phone number
+    }
+
+    // Find order by order ID
+    if (orderId) {
+      order = await Order.findById(orderId);
+    }
+
+    // Check if order exists
+    if (!order) {
+      return res.status(404).json({
+        message: messages.ORDER_NOT_FOUND,
+      });
+    }
+
+    // Prepare response
+    const response = {
+      orderId: order._id,
+      status: order.status,
+      statusHistory: order.statusHistory,
+      totalAmount: order.totalAmount,
+      items: order.items,
+      deliveryType: order.deliveryType,
+      deliveryAddress: order.deliveryAddress,
+      pickupDay: order.pickupDay,
+      pickupTime: order.pickupTime,
+      instructions: order.instructions,
+      orderPlacedAt: order.orderPlacedAt,
+    };
+
+    // Return order details
+    res.status(200).json({
+      message: messages.ORDER_FETCHED_SUCCESS,
+      order: response,
+    });
+  } catch (error) {
+    handleError("/order/track", "GET", error, req, res);
+  }
+});
 
 module.exports = router;

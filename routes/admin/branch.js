@@ -3,12 +3,25 @@ const { param } = require("express-validator");
 const { branchValidation } = require("../../utils/validation");
 const Branch = require("../../models/Branch");
 const authMiddleware = require("../../middleware/auth");
+const multer = require("multer");
+const streamifier = require("streamifier");
+const cloudinary = require("cloudinary").v2;
 const {
   validateRequest,
   stripUnwantedFields,
   handleError,
 } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configure Multer for file uploads
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -19,6 +32,7 @@ router.post(
   "/admin/branch/register",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
+  upload.single("image"), // Handle image upload
   [...branchValidation()], // Apply branch validation rules
   async (req, res) => {
     try {
@@ -38,11 +52,31 @@ router.post(
         return res.status(400).json({ message: messages.BRANCH_EXISTS });
       }
 
-      // Create and save new branch
-      const branch = new Branch(filteredBody);
+      let branchData = filteredBody;
+
+      // Upload image to Cloudinary if provided
+      if (req.file) {
+        const uploadStream = () =>
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "branches", public_id: filteredBody.name },
+              (error, result) => {
+                if (result) resolve(result);
+                else reject(error);
+              }
+            );
+            streamifier.createReadStream(req.file.buffer).pipe(stream);
+          });
+
+        const result = await uploadStream();
+        branchData.imageUrl = result.secure_url;
+      }
+
+      // Create and save the branch
+      const branch = new Branch(branchData);
       await branch.save();
 
-      // Return success response with the created branch
+      // Return success response
       res.status(201).json({
         message: messages.BRANCH_REGISTRATION_SUCCESS,
         branch,
@@ -60,6 +94,7 @@ router.put(
   "/admin/branch/update/:id",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
+  upload.single("image"), // Handle image upload
   [
     param("id").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
     ...branchValidation(), // Apply branch validation rules
@@ -72,20 +107,47 @@ router.put(
 
       const { id } = req.params;
 
-      // Strip unwanted fields
-      const filteredBody = stripUnwantedFields(req.body, Branch.schema);
-
-      // Find branch by ID
+      // Find the branch by ID
       const branch = await Branch.findById(id);
       if (!branch) {
         return res.status(404).json({ message: messages.BRANCH_NOT_FOUND });
       }
 
+      // Strip unwanted fields
+      const filteredBody = stripUnwantedFields(req.body, Branch.schema);
+
+      const oldName = branch.name;
+
+      let updateData = { name: filteredBody.name };
+
+      // Upload new image to Cloudinary if provided
+      if (req.file) {
+        // Delete old image from Cloudinary if it exists
+        if (branch.imageUrl) {
+          await cloudinary.uploader.destroy(`branches/${oldName}`);
+        }
+
+        const uploadStream = () =>
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "branches", public_id: filteredBody.name },
+              (error, result) => {
+                if (result) resolve(result);
+                else reject(error);
+              }
+            );
+            streamifier.createReadStream(req.file.buffer).pipe(stream);
+          });
+
+        const result = await uploadStream();
+        updateData.imageUrl = result.secure_url;
+      }
+
       // Update branch fields
-      Object.assign(branch, filteredBody);
+      Object.assign(branch, updateData);
       await branch.save();
 
-      // Return success response with the updated branch
+      // Return success response
       res.status(200).json({
         message: messages.BRANCH_UPDATE_SUCCESS,
         branch,

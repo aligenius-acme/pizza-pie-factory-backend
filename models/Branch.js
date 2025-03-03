@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
+const { BranchOpeningDays } = require("../utils/enums");
 
 const BranchSchema = new Schema(
   {
@@ -15,6 +16,18 @@ const BranchSchema = new Schema(
       trim: true,
     },
     deliveryRadius: { type: Number, required: true }, // In KM
+    imageUrl: { type: String }, // Add this field for storing the image URL
+    openingTimings: [
+      {
+        day: {
+          type: String,
+          required: true,
+          enum: Object.values(BranchOpeningDays),
+        },
+        openingTime: { type: String, required: true }, // e.g., "09:00"
+        closingTime: { type: String, required: true }, // e.g., "18:00"
+      },
+    ],
     isActive: { type: Boolean, default: false },
   },
   { timestamps: true }

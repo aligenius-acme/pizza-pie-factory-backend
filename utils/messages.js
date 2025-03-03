@@ -105,4 +105,23 @@ module.exports = {
   INVALID_OTP: "Invalid OTP or OTP has expired.",
   OTP_MESSAGE: (otp, expiry) =>
     `Your OTP for login is: ${otp}. It will expire in ${expiry} minutes.`,
+
+  // Pick-up messages
+  INVALID_DAY:
+    "Invalid day. Must be one of: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.",
+  DUPLICATE_DAY: "Duplicate day found in opening timings.",
+  INVALID_TIME_FORMAT: "Invalid time format. Use HH:MM.",
+  CLOSING_BEFORE_OPENING: "Closing time must be after opening time.",
+  PICKUP_TIME_OUTSIDE_HOURS:
+    "The selected pickup time is outside the branch's opening hours.",
+  BRANCH_CLOSED: "The branch is closed on the selected day.",
+
+  // Payment messages
+  REDIRECT_TO_PAYMENT: "Redirecting to payment gateway...",
+  PAYMENT_SUCCESS: "Payment successful",
+  PAYMENT_FAILED: "Payment failed",
+
+  // Order tracking messages
+  PHONE_NUMBER_OR_ORDER_ID_REQUIRED: "Phone number or order id required",
+  ORDER_FETCHED_SUCCESS: "Order successfully fetched",
 };

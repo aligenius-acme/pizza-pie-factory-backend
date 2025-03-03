@@ -5,6 +5,7 @@ const {
   DeliveryTypes,
   OrderStatusses,
   PaymentTypes,
+  BranchOpeningDays,
 } = require("../utils/enums");
 
 const OrderSchema = new Schema(
@@ -99,6 +100,33 @@ const OrderSchema = new Schema(
           return this.orderType === DeliveryTypes.DELIVERY;
         },
       },
+    },
+    pickupDay: {
+      type: String,
+      required: function () {
+        return this.deliveryType === DeliveryTypes.PICKUP;
+      },
+      enum: Object.values(BranchOpeningDays), // Assuming BranchOpeningDays is defined in enums
+    },
+    pickupTime: {
+      type: String,
+      required: function () {
+        return this.deliveryType === DeliveryTypes.PICKUP;
+      },
+      validate: {
+        validator: function (time) {
+          const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
+          return timeRegex.test(time);
+        },
+        message: (props) =>
+          `${props.value} is not a valid time (HH:MM format)!`,
+      },
+    },
+    phone: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
     },
     instructions: { type: String },
     orderPlacedAt: { type: Date, default: Date.now },

@@ -25,6 +25,8 @@ const CustomerSchema = new Schema(
         return !this.isGuest;
       },
     },
+    rewardPoints: { type: Number, default: 0 }, // Add reward points field
+    rewardPointsExpiry: { type: Date }, // Add expiry date for points
     deliveryAddresses: [
       {
         label: { type: String, enum: Object.values(AddressLabels) },

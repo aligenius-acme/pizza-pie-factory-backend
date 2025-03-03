@@ -6,7 +6,9 @@ const {
   OrderStatusses,
   PaymentTypes,
   DeliveryTypes,
+  BranchOpeningDays,
 } = require("../utils/enums");
+const { isValidTime, validateOpeningTimings } = require("../utils/helpers");
 const { body } = require("express-validator");
 
 // Reusable validation messages
@@ -132,6 +134,13 @@ const branchMessages = {
   deliveryRadius: {
     required: "Delivery radius is required",
     invalid: "Delivery radius must be a valid number",
+  },
+  openingTimings: {
+    required: "Opening timings are required",
+    invalid: "Invalid opening timings",
+    duplicateDay: "Duplicate day found in opening timings",
+    invalidTime: "Invalid time format. Use HH:MM",
+    closingBeforeOpening: "Closing time must be after opening time",
   },
 };
 
@@ -292,6 +301,16 @@ const orderMessages = {
       required: "Delivery longitude is required",
       invalid: "Delivery longitude must be a number",
     },
+  },
+  pickupDay: {
+    required: "Pickup day is required for PICKUP orders",
+    invalid: `Pickup day must be one of: ${Object.values(
+      BranchOpeningDays
+    ).join(", ")}`,
+  },
+  pickupTime: {
+    required: "Pickup time is required for PICKUP orders",
+    invalid: "Pickup time must be in HH:MM format",
   },
   instructions: {
     invalid: "Instructions must be a string",
@@ -537,6 +556,18 @@ const branchValidation = () => [
     .trim()
     .notEmpty()
     .withMessage(branchMessages.deliveryRadius.required),
+  body("openingTimings")
+    .isArray({ min: 1 })
+    .withMessage(branchMessages.openingTimings.required)
+    .custom((openingTimings) => {
+      try {
+        validateOpeningTimings(openingTimings);
+        return true;
+      } catch (error) {
+        throw new Error(error.message);
+      }
+    })
+    .withMessage(branchMessages.openingTimings.invalid),
 ];
 
 // Cart validation logic
@@ -698,6 +729,20 @@ const orderValidation = () => [
     .optional({ checkFalsy: true })
     .isNumeric()
     .withMessage(orderMessages.items.selectedSubOptionPrice.invalid),
+
+  body("pickupDay")
+    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.PICKUP)
+    .notEmpty()
+    .withMessage(orderMessages.pickupDay.required)
+    .isIn(Object.values(BranchOpeningDays))
+    .withMessage(orderMessages.pickupDay.invalid),
+
+  body("pickupTime")
+    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.PICKUP)
+    .notEmpty()
+    .withMessage(orderMessages.pickupTime.required)
+    .custom((value) => isValidTime(value))
+    .withMessage(orderMessages.pickupTime.invalid),
 
   // body("items.*.itemPrice")
   //   .notEmpty()
