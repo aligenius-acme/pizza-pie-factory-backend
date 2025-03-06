@@ -172,6 +172,13 @@ router.post(
         return res.status(400).json({ message: messages.INVALID_CREDENTIALS });
       }
 
+      // Return success response with JWT token
+      res.status(200).json({
+        message: messages.LOGIN_SUCCESS,
+        token: generateToken(employee._id, { role: employee.role }),
+      });
+
+      /*
       // Generate and send OTP
       const otp = generateOTP();
       const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // OTP expires in 5 minutes
@@ -192,6 +199,7 @@ router.post(
         message: messages.OTP_SENT,
         phone: employee.phone, // Return phone number for reference
       });
+      */
     } catch (error) {
       handleError("/admin/employee/login", "POST", error, req, res);
     }
@@ -374,6 +382,8 @@ router.get(
     query("sortBy").optional().isString(), // Validate sortBy (optional)
     query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
     query("role").optional().isString(), // Validate role (optional)
+    query("isActive").optional().isBoolean(), // Validate active (optional)
+    query("search").optional().isString(), // Validate search keyword (optional)
   ],
   async (req, res) => {
     try {
@@ -388,6 +398,8 @@ router.get(
         sortBy = "createdAt",
         order = "desc",
         role, // Optional filtering by role
+        isActive,
+        search,
       } = req.query;
 
       const pageNumber = parseInt(page, 10);
@@ -395,9 +407,22 @@ router.get(
       const sortOrder = order === "asc" ? 1 : -1;
 
       // Build filter object
-      let filter = { branchId: branchId, isDeleted: false }; // Exclude soft-deleted employees
+      let filter = { branchId: branchId };
       if (role) {
         filter.role = role; // Filter by role if provided
+      }
+      if (isActive !== undefined) {
+        filter.isActive = isActive; // Filter by active status if provided
+      }
+
+      // Add search functionality
+      if (search) {
+        const searchRegex = new RegExp(search, "i"); // Case-insensitive search
+        filter.$or = [
+          { firstName: { $regex: searchRegex } }, // Search by first name
+          { lastName: { $regex: searchRegex } }, // Search by last name
+          { email: { $regex: searchRegex } }, // Search by email
+        ];
       }
 
       // Find all employees for the branch with pagination and sorting
