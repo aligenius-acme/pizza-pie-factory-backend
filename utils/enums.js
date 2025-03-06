@@ -25,10 +25,10 @@ const OrderStatusses = Object.freeze({
 });
 
 const Roles = Object.freeze({
-  KITCHEN_STAFF: "Kitchen Staff",
-  DELIVERY_DRIVER: "Delivery Driver",
-  CUSTOMER_SUPPORT: "Customer Support",
-  SITE_ADMIN: "Site Admin",
+  KITCHEN_STAFF: "KITCHEN STAFF",
+  DELIVERY_DRIVER: "DELIVERY DRIVER",
+  CUSTOMER_SUPPORT: "CUSTOMER SUPPORT",
+  SITE_ADMIN: "SITE ADMIN",
 });
 
 const RecipientTypes = Object.freeze({

@@ -264,7 +264,10 @@ router.post(
 // @access  PUBLIC
 router.post(
   "/customer/reset-password/:token",
-  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)],
+  [
+    param("token").isString().withMessage(messages.INVALID_RESET_TOKEN),
+    customerValidation.password,
+  ],
   async (req, res) => {
     try {
       const { token } = req.params;

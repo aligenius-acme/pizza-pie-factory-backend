@@ -323,7 +323,10 @@ router.post(
 // @access  PUBLIC
 router.post(
   "/admin/employee/reset-password/:token",
-  [param("token").isString().withMessage(messages.INVALID_RESET_TOKEN)],
+  [
+    param("token").isString().withMessage(messages.INVALID_RESET_TOKEN),
+    employeeValidation.password,
+  ],
   async (req, res) => {
     try {
       const { token } = req.params;
@@ -361,11 +364,11 @@ router.post(
 // @desc    Get all employees for a specific branch (with pagination, sorting, and filtering)
 // @access  PRIVATE (Admin Only)
 router.get(
-  "/admin/employee/branch:branchId",
+  "/admin/employee/branch/:branchId",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
   [
-    param("id").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
+    param("branchId").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
     query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
     query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
     query("sortBy").optional().isString(), // Validate sortBy (optional)
