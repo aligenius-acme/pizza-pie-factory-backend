@@ -14,6 +14,7 @@ module.exports = {
   PASSWORD_RESET_SUCCESS: "Password reset successful",
   REGISTRATION_SUCCESS: "Registration successful",
   PROFILE_UPDATE_SUCCESS: "Profile updated successfully",
+  FORBIDDEN: "Forbidden",
 
   // Customer messages
   CUSTOMER_EXISTS: "Customer with this email or phone already exists",
@@ -28,6 +29,8 @@ module.exports = {
   EMPLOYEE_NOT_FOUND: "Employee not found",
   EMPLOYEE_NOT_ACTIVE: "Employee not active",
   NO_EMPLOYEES_FOUND: "No Employee(s) found",
+  SITE_ADMIN_VALIDATION_SKIP: "Validation skipped for Site Admin",
+  EMPLOYEE_VALIDATION_SUCCESS: "Validation successful",
 
   // Email messages
   RESET_EMAIL_SUBJECT: "Password Reset Request",

@@ -1,10 +1,11 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const axios = require("axios");
+// const axios = require("axios");
 const { validationResult } = require("express-validator");
 const messages = require("../utils/messages");
 const crypto = require("crypto");
 const ErrorLog = require("../models/ErrorLog");
+const { Roles } = require("../utils/enums"); // Import Roles from enums
 const { JWT_SECRET, JWT_EXPIRY } = process.env;
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Must be 32 bytes for AES-256
@@ -203,6 +204,40 @@ function decrypt(text) {
   return decrypted.toString();
 }
 
+/**
+ * Validate if the employee is associated with the specified branch.
+ * @param {string} employeeId - The ID of the authenticated employee.
+ * @param {string} branchId - The ID of the branch to validate against.
+ * @returns {Object} - Returns an object with `isValid` (boolean) and `message` (string).
+ */
+const validateEmployeeBranchAssociation = async (employeeId, branchId) => {
+  try {
+    // Find the employee by ID and select role and branchId
+    const employee = await Employee.findById(employeeId).select(
+      "role branchId"
+    );
+    if (!employee) {
+      return { isValid: false, message: messages.EMPLOYEE_NOT_FOUND };
+    }
+
+    // If the employee's role is "Site Admin", skip branch validation
+    if (employee.role === Roles.SITE_ADMIN) {
+      return { isValid: true, message: messages.SITE_ADMIN_VALIDATION_SKIP };
+    }
+
+    // For other roles, check if the employee's branchId matches the provided branchId
+    if (employee.branchId.toString() !== branchId) {
+      return { isValid: false, message: messages.FORBIDDEN };
+    }
+
+    // If validation passes
+    return { isValid: true, message: messages.EMPLOYEE_VALIDATION_SUCCESS };
+  } catch (error) {
+    console.error("Error in validateEmployeeBranchAssociation:", error);
+    return { isValid: false, message: messages.SERVER_ERROR };
+  }
+};
+
 module.exports = {
   generateToken,
   validateRequest,
@@ -216,4 +251,5 @@ module.exports = {
   validatePickupTime,
   encrypt,
   decrypt,
+  validateEmployeeBranchAssociation,
 };

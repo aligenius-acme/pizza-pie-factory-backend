@@ -247,6 +247,7 @@ router.post("/admin/employee/verify-otp", async (req, res) => {
 router.get(
   "/admin/employee/get/:id",
   authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
   [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)],
   async (req, res) => {
     try {
@@ -256,7 +257,44 @@ router.get(
       const { id } = req.params;
 
       // Find the employee by ID and exclude the password field
-      const employee = await Employee.findById(id).select("-password").lean();
+      const employee = await Employee.findById(id)
+        .select("-password -resetPasswordToken -resetPasswordExpiry")
+        .lean();
+      if (!employee) {
+        return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
+      }
+
+      // Return success response with employee details
+      res.status(200).json(employee);
+    } catch (error) {
+      handleError(
+        `/admin/employee/get/${req.params.id}`,
+        "GET",
+        error,
+        req,
+        res
+      );
+    }
+  }
+);
+
+// @route   GET /admin/employee/get
+// @desc    Get logged in employee's details
+// @access  PRIVATE
+router.get(
+  "/admin/employee/get",
+  authMiddleware.authenticateJWT,
+  async (req, res) => {
+    try {
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const { id } = req.user.id;
+
+      // Find the employee by ID and exclude the password field
+      const employee = await Employee.findById(id)
+        .select("-password -resetPasswordToken -resetPasswordExpiry")
+        .lean();
       if (!employee) {
         return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
       }

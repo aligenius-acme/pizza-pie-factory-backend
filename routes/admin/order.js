@@ -199,6 +199,79 @@ router.get(
   }
 );
 
+// @route   GET /order/customer
+// @desc    Get all orders for a customer (with pagination, sorting, and filtering)
+// @access  PRIVATE (Customer Only)
+router.get(
+  "/admin/order/branch/customer",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  [
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
+    query("sortBy").optional().isString(), // Validate sortBy (optional)
+    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
+    query("customerId").optional().isMongoId(), // Validate customerId (optional)
+  ],
+  async (req, res) => {
+    try {
+      // Validate request query
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "orderPlacedAt",
+        order = "desc",
+        customerId,
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      // Build filter object
+      let filter = {};
+
+      // If customerId is provided, use it; otherwise, use the authenticated user's ID
+      if (customerId) {
+        filter.customerId = customerId;
+      } else {
+        filter.customerId = req.user.id;
+      }
+
+      // Find all orders for the customer with pagination, sorting, and filtering
+      const orders = await Order.find(filter)
+        .populate("branch", "name") // Populate branch details
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
+        .lean();
+
+      if (!orders || orders.length === 0) {
+        return res.status(404).json({ message: messages.NO_ORDERS_FOUND });
+      }
+
+      // Get the total count of orders for the customer
+      const totalCount = await Order.countDocuments(filter);
+
+      // Return success response with the orders and pagination details
+      res.status(200).json({
+        success: true,
+        data: orders,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
+    } catch (error) {
+      handleError("/admin/order/branch/customer", "GET", error, req, res);
+    }
+  }
+);
+
 // @route   PATCH /admin/order/status/:id
 // @desc    Update existing order status
 // @access  PRIVATE
