@@ -80,7 +80,10 @@ router.put(
   authMiddleware.authenticateAdmin,
   [
     param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID),
-    employeeValidation.all(),
+    employeeValidation.name,
+    employeeValidation.email,
+    employeeValidation.phone,
+    employeeValidation.role,
   ],
   async (req, res) => {
     try {
