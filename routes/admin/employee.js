@@ -289,10 +289,8 @@ router.get(
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.user.id;
-
       // Find the employee by ID and exclude the password field
-      const employee = await Employee.findById(id)
+      const employee = await Employee.findById(req.user.id)
         .select("-password -resetPasswordToken -resetPasswordExpiry")
         .lean();
       if (!employee) {
@@ -302,13 +300,7 @@ router.get(
       // Return success response with employee details
       res.status(200).json(employee);
     } catch (error) {
-      handleError(
-        `/admin/employee/get/${req.params.id}`,
-        "GET",
-        error,
-        req,
-        res
-      );
+      handleError(`/admin/employee/get/${req.user.id}`, "GET", error, req, res);
     }
   }
 );
