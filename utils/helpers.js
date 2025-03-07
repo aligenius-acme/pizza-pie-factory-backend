@@ -6,6 +6,7 @@ const messages = require("../utils/messages");
 const crypto = require("crypto");
 const ErrorLog = require("../models/ErrorLog");
 const { Roles } = require("../utils/enums"); // Import Roles from enums
+const Employee = require("../models/Employee");
 const { JWT_SECRET, JWT_EXPIRY } = process.env;
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // Must be 32 bytes for AES-256

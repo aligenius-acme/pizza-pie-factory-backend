@@ -1,13 +1,14 @@
 const express = require("express");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const Customer = require("../../models/Customer");
+const Order = require("../../models/Order");
 const authMiddleware = require("../../middleware/auth");
 const {
   validateRequest,
   handleError,
   validateEmployeeBranchAssociation,
 } = require("../../utils/helpers");
-const messages = require("../utils/messages");
+const messages = require("../../utils/messages");
 require("dotenv").config();
 
 const router = express.Router();
@@ -25,6 +26,7 @@ router.get(
     query("sortBy").optional().isString(), // Validate sortBy (optional)
     query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
     query("search").optional().isString(), // Validate search keyword (optional)
+    query("createdAt").optional().isISO8601().toDate(), // Validate date (optional)
   ],
   async (req, res) => {
     try {
@@ -39,6 +41,7 @@ router.get(
         sortBy = "createdAt",
         order = "desc",
         search,
+        createdAt,
       } = req.query;
 
       const pageNumber = parseInt(page, 10);
@@ -77,9 +80,22 @@ router.get(
         ];
       }
 
+      // Add date filtering
+      if (createdAt) {
+        const startOfDay = new Date(createdAt);
+        startOfDay.setHours(0, 0, 0, 0); // Start of the day (00:00:00.000)
+
+        const endOfDay = new Date(createdAt);
+        endOfDay.setHours(23, 59, 59, 999); // End of the day (23:59:59.999)
+
+        filter.createdAt = { $gte: startOfDay, $lte: endOfDay }; // Filter by createdAt date
+      }
+
       // Find all customers who have placed orders in the branch
       const customers = await Customer.find(filter)
-        .select("-password -resetPasswordToken -resetPasswordExpiry") // Exclude sensitive fields
+        .select(
+          "-password -resetPasswordToken -resetPasswordExpiry -paymentMethods"
+        ) // Exclude sensitive fields
         .sort({ [sortBy]: sortOrder }) // Sort by the specified field
         .skip((pageNumber - 1) * pageSize) // Skip records for pagination
         .limit(pageSize) // Limit the number of records per page
