@@ -21,6 +21,7 @@ router.get(
   authMiddleware.authenticateJWT,
   [
     param("branchId").isMongoId().withMessage(messages.INVALID_ID),
+    query("customerId").optional().isMongoId().withMessage(messages.INVALID_ID),
     query("page").optional().isInt({ min: 1 }).toInt(),
     query("limit").optional().isInt({ min: 1 }).toInt(),
     query("sortBy").optional().isString(),
@@ -33,6 +34,7 @@ router.get(
 
       const { branchId } = req.params;
       const {
+        customerId,
         page = 1,
         limit = 10,
         sortBy = "orderPlacedAt",
@@ -43,13 +45,18 @@ router.get(
       const pageSize = parseInt(limit, 10);
       const sortOrder = order === "asc" ? 1 : -1;
 
+      // Build filter object
+      const filter = { branchId };
+      if (customerId) {
+        filter.customerId = customerId; // Add customer ID to filter if provided
+      }
+
       // Fetch orders with pagination and sorting
-      const orders = await Order.find({ branchId })
-        .populate({ path: "customerId", select: "name" })
-        .populate({ path: "items.foodItem", select: "name" })
-        .sort({ [sortBy]: sortOrder })
-        .skip((pageNumber - 1) * pageSize)
-        .limit(pageSize)
+      const orders = await Order.find(filter)
+        .populate({ path: "customerId", select: "firstName lastName email" }) // Populate customer details
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
         .lean();
 
       if (!orders || orders.length === 0) {
@@ -114,8 +121,7 @@ router.get(
 
       // Fetch orders with pagination and sorting
       const orders = await Order.find(filter)
-        .populate({ path: "customerId", select: "name" })
-        .populate({ path: "items.foodItem", select: "name" })
+        .populate({ path: "customerId", select: "firstName lastName email" }) // Populate customer details
         .sort({ [sortBy]: sortOrder })
         .skip((pageNumber - 1) * pageSize)
         .limit(pageSize)
@@ -167,8 +173,7 @@ router.get(
 
       // Fetch 10 most recent orders
       const orders = await Order.find({ branchId })
-        .populate({ path: "customerId", select: "name" })
-        .populate({ path: "items.foodItem", select: "name" })
+        .populate({ path: "customerId", select: "firstName lastName email" }) // Populate customer details
         .sort({ orderPlacedAt: -1 })
         .limit(10)
         .lean();

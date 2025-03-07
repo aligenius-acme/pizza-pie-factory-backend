@@ -20,12 +20,14 @@ module.exports = {
   GUEST_ACCOUNT_UPDATED: "Guest account updated successfully",
   CUSTOMER_NOT_FOUND: "Customer not found",
   INVALID_CUSTOMER_ID: "Invalid customer ID",
+  NO_ORDERS_FOUND: "No order(s) found",
 
   // Employee messages
   EMPLOYEE_EXISTS: "Employee with this email or phone already exists",
   INVALID_EMPLOYEE_ID: "Invalid employee ID",
   EMPLOYEE_NOT_FOUND: "Employee not found",
   EMPLOYEE_NOT_ACTIVE: "Employee not active",
+  NO_EMPLOYEES_FOUND: "No Employee(s) found",
 
   // Email messages
   RESET_EMAIL_SUBJECT: "Password Reset Request",

@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 const CustomizationSchema = new Schema(
   {
     offerId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Offer",
     },
     customizationName: { type: String, required: true },

@@ -22,15 +22,15 @@ const OrderSchema = new Schema(
     },
     items: [
       {
-        foodItem: {
-          type: mongoose.Schema.Types.ObjectId,
+        foodItemId: {
+          type: Schema.Types.ObjectId,
           ref: "FoodItem",
           default: null,
         },
         quantity: { type: Number, required: true },
         customizations: [
           {
-            customization: {
+            customizationId: {
               type: Schema.Types.ObjectId,
               ref: "Customization",
             },
@@ -49,13 +49,13 @@ const OrderSchema = new Schema(
         itemPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
         offer: {
-          offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+          offerId: { type: Schema.Types.ObjectId, ref: "Offer" },
         },
       },
     ],
     offers: [
       {
-        offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer" },
+        offerId: { type: Schema.Types.ObjectId, ref: "Offer" },
         isOfferComplete: { type: Boolean, default: false },
       },
     ],
@@ -136,5 +136,15 @@ const OrderSchema = new Schema(
   },
   { timestamps: true }
 );
+
+OrderSchema.virtual("branch", {
+  ref: "Branch",
+  localField: "branchId",
+  foreignField: "_id",
+  justOne: true, // Ensures that it returns a single object instead of an array
+});
+
+OrderSchema.set("toJSON", { virtuals: true });
+OrderSchema.set("toObject", { virtuals: true });
 
 module.exports = mongoose.model("Order", OrderSchema);
