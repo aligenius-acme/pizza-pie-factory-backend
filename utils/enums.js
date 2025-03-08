@@ -15,13 +15,13 @@ const DeliveryTypes = Object.freeze({
 });
 
 const OrderStatusses = Object.freeze({
-  PREPARING: "Preparing",
-  OUT_FOR_DELIVERY: "Out For Delivery",
-  DELIVERED: "Delivered",
-  NEW_ORDER: "New Order",
-  CANCELLED: "Cancelled",
-  NOT_DELIVERED: "Not Delivered",
-  PENDING_PAYMENT: "Pending Payment",
+  PREPARING: "PREPARING",
+  OUT_FOR_DELIVERY: "OUT FOR DELIVERY",
+  DELIVERED: "DELIVERED",
+  NEW_ORDER: "NEW ORDER",
+  CANCELLED: "CANCELLED",
+  NOT_DELIVERED: "NOT DELIVERED",
+  PENDING_PAYMENT: "PENDING PAYMENT",
 });
 
 const Roles = Object.freeze({
