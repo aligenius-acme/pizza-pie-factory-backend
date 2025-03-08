@@ -22,11 +22,13 @@ router.get(
   [
     param("branchId").isMongoId().withMessage(messages.INVALID_ID),
     query("customerId").optional().isMongoId().withMessage(messages.INVALID_ID),
+    query("orderId").optional().isMongoId().withMessage(messages.INVALID_ID),
     query("page").optional().isInt({ min: 1 }).toInt(),
     query("limit").optional().isInt({ min: 1 }).toInt(),
     query("sortBy").optional().isString(),
     query("order").optional().isIn(["asc", "desc"]),
     query("status").optional().isString(),
+    query("orderPlacedAt").optional().isISO8601().toDate(), // Validate date (optional)
   ],
   async (req, res) => {
     try {
@@ -36,11 +38,13 @@ router.get(
       const { branchId } = req.params;
       const {
         customerId,
+        orderId,
         page = 1,
         limit = 10,
         sortBy = "orderPlacedAt",
         order = "desc",
         status,
+        orderPlacedAt,
       } = req.query;
 
       const pageNumber = parseInt(page, 10);
@@ -64,20 +68,55 @@ router.get(
       if (customerId) {
         filter.customerId = customerId; // Add customer ID to filter if provided
       }
+      if (orderId) {
+        filter._id = orderId; // Add order ID to filter if provided
+      }
       if (status) {
         filter.status = status; // Add status to filter if provided
       }
 
-      // Fetch orders with pagination and sorting
-      const orders = await Order.find(filter)
-        .populate({ path: "customerId", select: "firstName lastName email" }) // Populate customer details
-        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
-        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
-        .limit(pageSize) // Limit the number of records per page
-        .lean();
+      // Add date filtering
+      if (orderPlacedAt) {
+        const startOfDay = new Date(orderPlacedAt);
+        startOfDay.setHours(0, 0, 0, 0); // Start of the day (00:00:00.000)
+
+        const endOfDay = new Date(orderPlacedAt);
+        endOfDay.setHours(23, 59, 59, 999); // End of the day (23:59:59.999)
+
+        filter.orderPlacedAt = { $gte: startOfDay, $lte: endOfDay }; // Filter by orderPlacedAt date
+      }
+
+      // Fetch orders or a single order based on whether orderId is provided
+      let query = Order.find(filter).populate({
+        path: "customerId",
+        select: "firstName lastName email phone",
+      }); // Populate customer details
+
+      // Conditionally apply .select() if orderId is not provided
+      if (!orderId) {
+        query = query.select("_id totalAmount status orderPlacedAt");
+      }
+
+      // Apply sorting, pagination, and limit only if orderId is not provided
+      if (!orderId) {
+        query = query
+          .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+          .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+          .limit(pageSize); // Limit the number of records per page
+      }
+
+      const orders = await query.lean();
 
       if (!orders || orders.length === 0) {
         return res.status(404).json({ message: messages.NO_ORDERS_FOUND });
+      }
+
+      // If orderId is provided, return the single order
+      if (orderId) {
+        return res.status(200).json({
+          success: true,
+          data: orders[0], // Return the first (and only) order
+        });
       }
 
       // Get total count of orders for the branch
@@ -167,7 +206,7 @@ router.patch(
       if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
-      const { status } = req.body;
+      const { status, deliverDriverId } = req.body;
 
       // Validate that the employee is associated with the specified branch
       const validationResult = await validateEmployeeBranchAssociation(
@@ -192,6 +231,11 @@ router.patch(
 
       if (status === OrderStatusses.OUT_FOR_DELIVERY) {
         updateData.completedAt = new Date();
+      }
+
+      // Associate delivery driver if availeble
+      if (deliverDriverId) {
+        updateData.deliverDriverId = deliverDriverId;
       }
 
       // Update the order

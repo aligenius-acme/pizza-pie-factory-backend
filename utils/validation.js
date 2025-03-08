@@ -216,6 +216,9 @@ const orderMessages = {
     required: "Branch ID is required",
     invalid: "Invalid branch ID",
   },
+  deliveryDriverId: {
+    invalid: "Invalid delivery driver ID",
+  },
   items: {
     foodItem: {
       invalid: "Invalid food item ID",
@@ -680,6 +683,10 @@ const orderValidation = () => [
     .withMessage(orderMessages.branchId.required)
     .isMongoId()
     .withMessage(orderMessages.branchId.invalid),
+
+  body("deliveryDriverId")
+    .isMongoId()
+    .withMessage(orderMessages.deliveryDriverId.invalid),
 
   body("items.*.foodItem")
     .optional({ checkFalsy: true })

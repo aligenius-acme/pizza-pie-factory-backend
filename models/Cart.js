@@ -47,6 +47,8 @@ const CartSchema = new Schema(
         isOfferComplete: { type: Boolean, default: false },
       },
     ],
+    tax: { type: Number, required: true, min: 0 },
+    deliveryCharges: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true },
   },
   { timestamps: true }

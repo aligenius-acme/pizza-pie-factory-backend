@@ -20,6 +20,10 @@ const OrderSchema = new Schema(
       ref: "Branch",
       required: true,
     },
+    deliverDriverId: {
+      type: Schema.Types.ObjectId,
+      ref: "Employee",
+    },
     items: [
       {
         foodItemId: {
@@ -59,6 +63,8 @@ const OrderSchema = new Schema(
         isOfferComplete: { type: Boolean, default: false },
       },
     ],
+    tax: { type: Number, required: true, min: 0 },
+    deliveryCharges: { type: Number, required: true, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     status: {
       type: String,
@@ -122,7 +128,7 @@ const OrderSchema = new Schema(
           `${props.value} is not a valid time (HH:MM format)!`,
       },
     },
-    phone: {
+    phoneNumber: {
       type: String,
       unique: true,
       sparse: true,

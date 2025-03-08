@@ -99,6 +99,8 @@ router.post(
         branchId: filteredBody.branchId,
         items: cart.items,
         offers: cart.offers,
+        tax: cart.tax,
+        deliveryCharges: cart.deliveryCharges,
         totalAmount: cart.totalAmount,
         status: OrderStatusses.PENDING_PAYMENT, // Default status for credit card payments
         paymentMethod: filteredBody.paymentMethod,
