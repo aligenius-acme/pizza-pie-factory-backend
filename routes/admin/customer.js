@@ -27,6 +27,7 @@ router.get(
     query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
     query("search").optional().isString(), // Validate search keyword (optional)
     query("createdAt").optional().isISO8601().toDate(), // Validate date (optional)
+    query("isGuest").optional().isBoolean(), // Validate customer type (optional)
   ],
   async (req, res) => {
     try {
@@ -42,6 +43,7 @@ router.get(
         order = "desc",
         search,
         createdAt,
+        isGuest,
       } = req.query;
 
       const pageNumber = parseInt(page, 10);
@@ -68,6 +70,11 @@ router.get(
 
       // Build filter object for customers
       let filter = { _id: { $in: customerIds } };
+
+      // Add customer type filter
+      if (isGuest) {
+        filter.isGuest = isGuest; // Add isGuest to filter if provided
+      }
 
       // Add search functionality
       if (search) {
