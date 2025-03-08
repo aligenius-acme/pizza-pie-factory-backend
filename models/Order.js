@@ -20,7 +20,7 @@ const OrderSchema = new Schema(
       ref: "Branch",
       required: true,
     },
-    deliverDriverId: {
+    deliveryDriverId: {
       type: Schema.Types.ObjectId,
       ref: "Employee",
     },
@@ -143,12 +143,19 @@ const OrderSchema = new Schema(
   { timestamps: true }
 );
 
-OrderSchema.virtual("branch", {
-  ref: "Branch",
-  localField: "branchId",
-  foreignField: "_id",
-  justOne: true, // Ensures that it returns a single object instead of an array
-});
+// OrderSchema.virtual("deliveryDriverId", {
+//   ref: "Employee",
+//   localField: "deliveryDriverId",
+//   foreignField: "_id",
+//   justOne: true,
+// });
+
+// OrderSchema.virtual("branch", {
+//   ref: "Branch",
+//   localField: "branchId",
+//   foreignField: "_id",
+//   justOne: true, // Ensures that it returns a single object instead of an array
+// });
 
 OrderSchema.set("toJSON", { virtuals: true });
 OrderSchema.set("toObject", { virtuals: true });

@@ -64,6 +64,8 @@ module.exports = {
   ).join(", ")}`,
   ORDER_STATUS_UPDATED_SUCCESS: "Order status updated successfully",
   ORDER_INVALID_REQUEST: "Invalid request",
+  DELIVERY_DRIVER_REQUIRED:
+    "Delivery driver ID is required for OUT_FOR_DELIVERY status",
 
   // Notification messages
   NOTIFICATION_CUSTOMER_ORDER_CREATED: {

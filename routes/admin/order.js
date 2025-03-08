@@ -110,6 +110,14 @@ router.get(
         });
       }
 
+      // Populate deliveryDriver details if orderId is provided
+      if (orderId) {
+        query = query.populate({
+          path: "deliveryDriverId", // Ensure this matches the field name in the schema
+          select: "firstName lastName email phone",
+        });
+      }
+
       // Apply sorting, pagination, and limit only if orderId is not provided
       if (!orderId) {
         query = query
@@ -124,21 +132,25 @@ router.get(
         return res.status(404).json({ message: messages.NO_ORDERS_FOUND });
       }
 
-      // Rename `customerId` to `customer` in the response
-      const renameCustomerField = (order) => {
+      // Rename `customerId` to `customer` and `deliverDriverId` to `deliveryDriver` in the response
+      const renameFields = (order) => {
         if (order.customerId) {
           order.customer = order.customerId;
           delete order.customerId;
         }
+        if (order.deliveryDriverId) {
+          order.deliveryDriver = order.deliveryDriverId;
+          delete order.deliveryDriverId;
+        }
         return order;
       };
 
-      // If orderId is provided, return the single order with customer details
+      // If orderId is provided, return the single order with customer and deliveryDriver details
       if (orderId) {
-        const orderWithCustomer = renameCustomerField(orders[0]);
+        const orderWithDetails = renameFields(orders[0]);
         return res.status(200).json({
           success: true,
-          data: orderWithCustomer,
+          data: orderWithDetails,
         });
       }
 
@@ -154,7 +166,7 @@ router.get(
       }
 
       // Rename `customerId` to `customer` for all orders
-      const ordersWithRenamedField = orders.map(renameCustomerField);
+      const ordersWithRenamedFields = orders.map(renameFields);
 
       // Get total count of orders for the branch based on the applied filters
       const totalCount = await Order.countDocuments(filter); // Use the same filter object
@@ -162,7 +174,7 @@ router.get(
       // Return success response with pagination details and customer details if applicable
       const response = {
         success: true,
-        data: ordersWithRenamedField,
+        data: ordersWithRenamedFields,
         pagination: {
           totalItems: totalCount,
           totalPages: Math.ceil(totalCount / pageSize),
@@ -261,6 +273,13 @@ router.patch(
         return res
           .status(validationResult.message === messages.FORBIDDEN ? 403 : 404)
           .json({ message: validationResult.message });
+      }
+
+      // Validate that deliveryDriverId is provided if status is OUT_FOR_DELIVERY
+      if (status === OrderStatusses.OUT_FOR_DELIVERY && !deliverDriverId) {
+        return res.status(400).json({
+          message: messages.DELIVERY_DRIVER_REQUIRED,
+        });
       }
 
       // Prepare update data
