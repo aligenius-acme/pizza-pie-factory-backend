@@ -63,6 +63,7 @@ module.exports = {
     OrderStatusses
   ).join(", ")}`,
   ORDER_STATUS_UPDATED_SUCCESS: "Order status updated successfully",
+  ORDER_INVALID_REQUEST: "Invalid request",
 
   // Notification messages
   NOTIFICATION_CUSTOMER_ORDER_CREATED: {

@@ -9,6 +9,7 @@ const {
 const { OrderStatusses } = require("../../utils/enums");
 const messages = require("../../utils/messages");
 const Order = require("../../models/Order");
+const Customer = require("../../models/Customer");
 const axios = require("axios");
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.get(
     query("sortBy").optional().isString(),
     query("order").optional().isIn(["asc", "desc"]),
     query("status").optional().isString(),
-    query("orderPlacedAt").optional().isISO8601().toDate(), // Validate date (optional)
+    query("orderPlacedAt").optional().isISO8601().toDate(),
   ],
   async (req, res) => {
     try {
@@ -46,6 +47,13 @@ router.get(
         status,
         orderPlacedAt,
       } = req.query;
+
+      // Custom validation: If orderId is provided, customerId is mandatory
+      if (orderId && !customerId) {
+        return res.status(400).json({
+          message: ORDER_INVALID_REQUEST,
+        });
+      }
 
       const pageNumber = parseInt(page, 10);
       const pageSize = parseInt(limit, 10);
@@ -87,14 +95,19 @@ router.get(
       }
 
       // Fetch orders or a single order based on whether orderId is provided
-      let query = Order.find(filter).populate({
-        path: "customerId",
-        select: "firstName lastName email phone",
-      }); // Populate customer details
+      let query = Order.find(filter);
 
       // Conditionally apply .select() if orderId is not provided
       if (!orderId) {
         query = query.select("_id totalAmount status orderPlacedAt");
+      }
+
+      // Apply populate only if orderId is provided or customerId is not provided
+      if (orderId || !customerId) {
+        query = query.populate({
+          path: "customerId",
+          select: "firstName lastName email phone",
+        });
       }
 
       // Apply sorting, pagination, and limit only if orderId is not provided
@@ -111,28 +124,58 @@ router.get(
         return res.status(404).json({ message: messages.NO_ORDERS_FOUND });
       }
 
-      // If orderId is provided, return the single order
+      // Rename `customerId` to `customer` in the response
+      const renameCustomerField = (order) => {
+        if (order.customerId) {
+          order.customer = order.customerId;
+          delete order.customerId;
+        }
+        return order;
+      };
+
+      // If orderId is provided, return the single order with customer details
       if (orderId) {
+        const orderWithCustomer = renameCustomerField(orders[0]);
         return res.status(200).json({
           success: true,
-          data: orders[0], // Return the first (and only) order
+          data: orderWithCustomer,
         });
       }
 
-      // Get total count of orders for the branch
-      const totalCount = await Order.countDocuments({ branchId });
+      // If customerId is provided but not orderId, fetch customer details separately
+      let customerDetails = null;
+      if (customerId && !orderId) {
+        const customer = await Customer.findById(customerId).select(
+          "firstName lastName email phone"
+        );
+        if (customer) {
+          customerDetails = customer;
+        }
+      }
 
-      // Return success response with pagination details
-      res.status(200).json({
+      // Rename `customerId` to `customer` for all orders
+      const ordersWithRenamedField = orders.map(renameCustomerField);
+
+      // Get total count of orders for the branch based on the applied filters
+      const totalCount = await Order.countDocuments(filter); // Use the same filter object
+
+      // Return success response with pagination details and customer details if applicable
+      const response = {
         success: true,
-        data: orders,
+        data: ordersWithRenamedField,
         pagination: {
           totalItems: totalCount,
           totalPages: Math.ceil(totalCount / pageSize),
           currentPage: pageNumber,
           pageSize,
         },
-      });
+      };
+
+      if (customerDetails) {
+        response.customer = customerDetails;
+      }
+
+      res.status(200).json(response);
     } catch (error) {
       handleError("/admin/order/branch/:branchId", "GET", error, req, res);
     }

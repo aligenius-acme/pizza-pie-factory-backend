@@ -244,42 +244,42 @@ router.post("/admin/employee/verify-otp", async (req, res) => {
   }
 });
 
-// @route   GET /admin/employee/get/:id
-// @desc    Get an employee's details by ID
-// @access  PRIVATE
-router.get(
-  "/admin/employee/get/:id",
-  authMiddleware.authenticateJWT,
-  authMiddleware.authenticateAdmin,
-  [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)],
-  async (req, res) => {
-    try {
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// // @route   GET /admin/employee/get/:id
+// // @desc    Get an employee's details by ID
+// // @access  PRIVATE
+// router.get(
+//   "/admin/employee/get/:id",
+//   authMiddleware.authenticateJWT,
+//   authMiddleware.authenticateAdmin,
+//   [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)],
+//   async (req, res) => {
+//     try {
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+//       const { id } = req.params;
 
-      // Find the employee by ID and exclude the password field
-      const employee = await Employee.findById(id)
-        .select("-password -resetPasswordToken -resetPasswordExpiry")
-        .lean();
-      if (!employee) {
-        return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
-      }
+//       // Find the employee by ID and exclude the password field
+//       const employee = await Employee.findById(id)
+//         .select("-password -resetPasswordToken -resetPasswordExpiry")
+//         .lean();
+//       if (!employee) {
+//         return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
+//       }
 
-      // Return success response with employee details
-      res.status(200).json(employee);
-    } catch (error) {
-      handleError(
-        `/admin/employee/get/${req.params.id}`,
-        "GET",
-        error,
-        req,
-        res
-      );
-    }
-  }
-);
+//       // Return success response with employee details
+//       res.status(200).json(employee);
+//     } catch (error) {
+//       handleError(
+//         `/admin/employee/get/${req.params.id}`,
+//         "GET",
+//         error,
+//         req,
+//         res
+//       );
+//     }
+//   }
+// );
 
 // @route   GET /admin/employee/get
 // @desc    Get logged in employee's details
@@ -410,6 +410,7 @@ router.get(
   authMiddleware.authenticateAdmin, // Ensure user is an admin
   [
     param("branchId").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
+    query("employeeId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate employee ID
     query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
     query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
     query("sortBy").optional().isString(), // Validate sortBy (optional)
@@ -426,6 +427,7 @@ router.get(
 
       const { branchId } = req.params;
       const {
+        employeeId,
         page = 1,
         limit = 10,
         sortBy = "createdAt",
@@ -443,6 +445,9 @@ router.get(
       let filter = { branchId: branchId };
       if (role) {
         filter.role = role; // Filter by role if provided
+      }
+      if (employeeId) {
+        filter._id = employeeId; // Add employee ID to filter if provided
       }
       if (isActive !== undefined) {
         filter.isActive = isActive; // Filter by active status if provided
@@ -468,6 +473,14 @@ router.get(
 
       if (!employees || employees.length === 0) {
         return res.status(404).json({ message: messages.NO_EMPLOYEES_FOUND });
+      }
+
+      // If employeeId is provided, return the single employee
+      if (employeeId) {
+        return res.status(200).json({
+          success: true,
+          data: employees[0], // Return the first (and only) employee
+        });
       }
 
       // Get the total count of employees for the branch
