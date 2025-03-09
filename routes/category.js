@@ -1,9 +1,7 @@
 const express = require("express");
 const { param } = require("express-validator");
 const Category = require("../models/Category");
-const FoodItem = require("../models/FoodItem");
-const authMiddleware = require("../middleware/auth");
-const { validateRequest } = require("../utils/helpers");
+const { validateRequest, handleError } = require("../utils/helpers");
 const messages = require("../utils/messages");
 
 const router = express.Router();
@@ -23,16 +21,7 @@ router.get("/categories", async (req, res) => {
     // Return success response
     res.status(200).json(categories);
   } catch (error) {
-    // Handle unexpected errors
-    console.error("Get categories error:", error);
-
-    // Log error in MongoDB
-    await logError("/categories", "GET", error.message, error.stack, req.body);
-
-    res.status(500).json({
-      message: messages.INTERNAL_SERVER_ERROR,
-      error: error.message,
-    });
+    handleError("/categories", "GET", error, req, res);
   }
 });
 
@@ -63,22 +52,7 @@ router.get(
       // Return success response
       res.status(200).json(category);
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Category get error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/category/get/${param("id").isMongoId()}`,
-        "GET",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/categories", "GET", error, req, res);
     }
   }
 );

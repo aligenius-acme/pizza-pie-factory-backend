@@ -2,20 +2,10 @@ const express = require("express");
 const { param, query } = require("express-validator");
 const FoodItem = require("../models/FoodItem");
 const mongoose = require("mongoose");
-const { validateRequest, logError } = require("../utils/helpers");
+const { validateRequest, handleError } = require("../utils/helpers");
 const messages = require("../utils/messages");
 
 const router = express.Router();
-
-// Centralized error handling
-const handleError = async (route, method, error, req, res) => {
-  console.error(`${route} error:`, error);
-  await logError(route, method, error.message, error.stack, req.body);
-  res.status(500).json({
-    message: messages.INTERNAL_SERVER_ERROR,
-    error: error.message,
-  });
-};
 
 // @route   GET /fooditems
 // @desc    Get all food items with pagination and filtering

@@ -5,7 +5,7 @@ const Offer = require("../models/Offer");
 const FoodItem = require("../models/FoodItem");
 const authMiddleware = require("../middleware/auth");
 const { cartValidation } = require("../utils/validation");
-const { validateRequest } = require("../utils/helpers");
+const { validateRequest, handleError } = require("../utils/helpers");
 const messages = require("../utils/messages"); // Import messages
 
 const router = express.Router();
@@ -144,22 +144,7 @@ router.post(
         cart,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Cart creation error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        "/cart/create",
-        "POST",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/cart/create", "POST", error, req, res);
     }
   }
 );
@@ -318,22 +303,7 @@ router.put(
         cart,
       });
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Cart update error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/cart/update/${param("id").isMongoId()}`,
-        "PUT",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/cart/update", "PUT", error, req, res);
     }
   }
 );
@@ -363,22 +333,7 @@ router.get(
       // Return the cart details
       res.status(200).json(cart);
     } catch (error) {
-      // Handle unexpected errors
-      console.error("Cart get error:", error);
-
-      // Log error in MongoDB
-      await logError(
-        `/cart/get/${param("id").isMongoId()}`,
-        "GET",
-        error.message,
-        error.stack,
-        req.body
-      );
-
-      res.status(500).json({
-        message: messages.INTERNAL_SERVER_ERROR,
-        error: error.message,
-      });
+      handleError("/cart/get", "GET", error, req, res);
     }
   }
 );

@@ -10,7 +10,6 @@ const {
   validateRequest,
   stripUnwantedFields,
   handleError,
-  validateEmployeeBranchAssociation,
 } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 

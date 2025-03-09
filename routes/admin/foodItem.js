@@ -9,7 +9,11 @@ const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
 const { foodItemValidation } = require("../../utils/validation");
-const { validateRequest, logError } = require("../../utils/helpers");
+const {
+  validateRequest,
+  stripUnwantedFields,
+  handleError,
+} = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 
 // Configure Cloudinary
@@ -23,24 +27,6 @@ cloudinary.config({
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
-
-// Utility function to strip unwanted fields
-const stripUnwantedFields = (body, schema) => {
-  const schemaPaths = Object.keys(schema.paths);
-  return Object.fromEntries(
-    Object.entries(body).filter(([key]) => schemaPaths.includes(key))
-  );
-};
-
-// Centralized error handling
-const handleError = async (route, method, error, req, res) => {
-  console.error(`${route} error:`, error);
-  await logError(route, method, error.message, error.stack, req.body);
-  res.status(500).json({
-    message: messages.INTERNAL_SERVER_ERROR,
-    error: error.message,
-  });
-};
 
 // @route   POST /admin/fooditem/register
 // @desc    Register a new food item (Admin Only)
