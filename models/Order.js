@@ -26,7 +26,7 @@ const OrderSchema = new Schema(
     },
     items: [
       {
-        foodItemId: {
+        foodItem: {
           type: Schema.Types.ObjectId,
           ref: "FoodItem",
           default: null,

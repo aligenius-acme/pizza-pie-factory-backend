@@ -118,6 +118,12 @@ router.get(
         });
       }
 
+      // Populate foodItemId for each item in the items array
+      query = query.populate({
+        path: "items.foodItem", // Nested path for foodItem
+        select: "name description imageUrl", // Include the required fields
+      });
+
       // Apply sorting, pagination, and limit only if orderId is not provided
       if (!orderId) {
         query = query
