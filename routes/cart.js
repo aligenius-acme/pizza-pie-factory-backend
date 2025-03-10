@@ -2,6 +2,7 @@ const express = require("express");
 const { param } = require("express-validator");
 const Cart = require("../models/Cart");
 const Offer = require("../models/Offer");
+const Customization = require("../models/Customization");
 const FoodItem = require("../models/FoodItem");
 const authMiddleware = require("../middleware/auth");
 const { cartValidation } = require("../utils/validation");
@@ -32,22 +33,57 @@ router.post(
 
       // Process each item in the cart
       for (const item of items) {
-        const foodItem = await FoodItem.findById(item.foodItem);
+        const foodItem = await FoodItem.findById(item.foodItemId);
         if (!foodItem) {
           return res.status(400).json({ message: messages.INVALID_FOOD_ITEM });
         }
 
-        // Calculate item total price
-        let itemTotal = foodItem.price * item.quantity;
+        // Fetch customizations from the database
+        const customizations = await Customization.find({
+          _id: { $in: item.customizations.map((c) => c.customization) },
+        });
+
+        // Calculate item total price using the price from the database
+        let itemTotal = foodItem.price * item.quantity; // Use the price from the database
         let additionalPrice = 0;
 
-        // Add customization prices
+        // Add customization prices from the database
         if (item.customizations) {
           for (const cust of item.customizations) {
-            additionalPrice +=
-              cust.selectedOption.additionalPrice * item.quantity;
-            for (const subOpt of cust.selectedSubOptions) {
-              additionalPrice += subOpt.additionalPrice * item.quantity;
+            const customization = customizations.find(
+              (c) => c._id.toString() === cust.customization.toString()
+            );
+            if (!customization) {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION });
+            }
+
+            // Find the selected option in the customization
+            const selectedOption = customization.customizations
+              .flatMap((c) => c.options)
+              .find(
+                (opt) =>
+                  opt._id.toString() === cust.selectedOption._id.toString()
+              );
+
+            console.log(selectedOption);
+            if (selectedOption) {
+              additionalPrice += selectedOption.additionalPrice * item.quantity;
+
+              // Add sub-option prices if they exist
+              if (cust.selectedSubOptions) {
+                for (const subOptId of cust.selectedSubOptions) {
+                  const selectedSubOption = selectedOption.subOptions.find(
+                    (subOpt) =>
+                      subOpt._id.toString() === subOptId._id.toString()
+                  );
+                  if (selectedSubOption) {
+                    additionalPrice +=
+                      selectedSubOption.additionalPrice * item.quantity;
+                  }
+                }
+              }
             }
           }
         }
@@ -57,7 +93,7 @@ router.post(
         // Add item to updatedItems array
         updatedItems.push({
           ...item,
-          itemPrice: foodItem.price,
+          itemPrice: foodItem.price, // Use the price from the database
           additionalPrice,
           totalPrice: itemTotal,
         });
@@ -97,18 +133,18 @@ router.post(
                 offerCustomizationIds.includes(cust.customization.toString())
               )
             ) {
-              offerItems.add(item.foodItem);
+              offerItems.add(item.foodItemId);
             }
           }
 
           // Adjust prices for items included in the offer
           for (const item of updatedItems) {
-            if (offerItems.has(item.foodItem)) {
+            if (offerItems.has(item.foodItemId)) {
               additionalOfferPrice += item.additionalPrice;
               item.itemPrice = 0;
               item.totalPrice = 0;
               const offer = appliedOffers.find(
-                (o) => offerItems.has(item.foodItem.toString()) && o.offerId
+                (o) => offerItems.has(item.foodItemId.toString()) && o.offerId
               );
               if (offer) {
                 item.offer = { offerId: offer.offerId };
@@ -120,7 +156,7 @@ router.post(
 
       // Calculate total amount for non-offer items
       for (const item of updatedItems) {
-        if (!offerItems.has(item.foodItem)) {
+        if (!offerItems.has(item.foodItemId)) {
           totalAmount += item.totalPrice;
         }
       }
@@ -149,14 +185,14 @@ router.post(
   }
 );
 
-// @route   PUT /cart/update/:id
+// @route   PUT /cart/update/:cartId
 // @desc    Update an existing cart for the authenticated customer
 // @access  PRIVATE (Customer Only)
 router.put(
-  "/cart/update/:id",
+  "/cart/update/:cartId",
   authMiddleware.authenticateJWT, // Authenticate JWT
   [
-    param("id").isMongoId().withMessage(messages.INVALID_CART_ID), // Validate cart ID
+    param("cartId").isMongoId().withMessage(messages.INVALID_CART_ID), // Validate cart ID
     ...cartValidation(), // Apply cart validation rules
   ],
   async (req, res) => {
@@ -164,65 +200,86 @@ router.put(
       // Validate request body
       if (validateRequest(req, res)) return;
 
-      const { id } = req.params;
+      const { cartId } = req.params;
       const { items, offers } = req.body;
       const customerId = req.user.id; // Get customer ID from authenticated user
 
       // Find the cart
-      let cart = await Cart.findOne({ _id: id, customerId });
+      let cart = await Cart.findOne({ _id: cartId, customerId });
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
       }
 
       let totalAmount = 0;
       let appliedOffers = [];
-      let updatedItems = [...cart.items];
+      let updatedItems = [];
       let offerItems = new Set();
 
-      // Update or add new items
+      // Process each item in the cart
       for (const item of items) {
-        const foodItem = await FoodItem.findById(item.foodItem);
+        const foodItem = await FoodItem.findById(item.foodItemId);
         if (!foodItem) {
           return res.status(400).json({ message: messages.INVALID_FOOD_ITEM });
         }
 
-        // Calculate item total price
-        let itemTotal = foodItem.price * item.quantity;
+        // Fetch customizations from the database
+        const customizations = await Customization.find({
+          _id: { $in: item.customizations.map((c) => c.customization) },
+        });
+
+        // Calculate item total price using the price from the database
+        let itemTotal = foodItem.price * item.quantity; // Use the price from the database
         let additionalPrice = 0;
 
-        // Add customization prices
+        // Add customization prices from the database
         if (item.customizations) {
           for (const cust of item.customizations) {
-            additionalPrice +=
-              cust.selectedOption.additionalPrice * item.quantity;
-            for (const subOpt of cust.selectedSubOptions) {
-              additionalPrice += subOpt.additionalPrice * item.quantity;
+            const customization = customizations.find(
+              (c) => c._id.toString() === cust.customization.toString()
+            );
+            if (!customization) {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION });
+            }
+
+            // Find the selected option in the customization
+            const selectedOption = customization.customizations
+              .flatMap((c) => c.options)
+              .find(
+                (opt) =>
+                  opt._id.toString() === cust.selectedOption._id.toString()
+              );
+
+            if (selectedOption) {
+              additionalPrice += selectedOption.additionalPrice * item.quantity;
+
+              // Add sub-option prices if they exist
+              if (cust.selectedSubOptions) {
+                for (const subOptId of cust.selectedSubOptions) {
+                  const selectedSubOption = selectedOption.subOptions.find(
+                    (subOpt) =>
+                      subOpt._id.toString() === subOptId._id.toString()
+                  );
+                  if (selectedSubOption) {
+                    additionalPrice +=
+                      selectedSubOption.additionalPrice * item.quantity;
+                  }
+                }
+              }
             }
           }
         }
 
         itemTotal += additionalPrice;
 
-        // Check if item already exists in the cart
-        const existingItemIndex = updatedItems.findIndex(
-          (cartItem) =>
-            cartItem.foodItem.toString() === item.foodItem.toString()
-        );
-
-        if (existingItemIndex !== -1) {
-          // Update existing item
-          updatedItems[existingItemIndex].quantity = item.quantity;
-          updatedItems[existingItemIndex].totalPrice = itemTotal;
-          updatedItems[existingItemIndex].additionalPrice = additionalPrice;
-        } else {
-          // Add new item
-          updatedItems.push({
-            ...item,
-            itemPrice: foodItem.price,
-            additionalPrice,
-            totalPrice: itemTotal,
-          });
-        }
+        // Add item to updatedItems array
+        updatedItems.push({
+          ...item,
+          itemPrice: foodItem.price, // Use the price from the database
+          additionalPrice,
+          totalPrice: itemTotal,
+        });
       }
 
       // Process offers
@@ -236,7 +293,7 @@ router.put(
         const offerCustomizationIds = offer.customizations.map((c) =>
           c._id.toString()
         );
-        const cartCustomizationIds = updatedItems.flatMap((item) =>
+        const cartCustomizationIds = items.flatMap((item) =>
           item.customizations.map((c) => c.customization.toString())
         );
 
@@ -253,24 +310,24 @@ router.put(
           offerPriceTotal += offer.offerPrice;
 
           // Track items included in the offer
-          for (const item of updatedItems) {
+          for (const item of items) {
             if (
               item.customizations.some((cust) =>
                 offerCustomizationIds.includes(cust.customization.toString())
               )
             ) {
-              offerItems.add(item.foodItem);
+              offerItems.add(item.foodItemId);
             }
           }
 
           // Adjust prices for items included in the offer
           for (const item of updatedItems) {
-            if (offerItems.has(item.foodItem)) {
+            if (offerItems.has(item.foodItemId)) {
               additionalOfferPrice += item.additionalPrice;
               item.itemPrice = 0;
               item.totalPrice = 0;
               const offer = appliedOffers.find(
-                (o) => offerItems.has(item.foodItem.toString()) && o.offerId
+                (o) => offerItems.has(item.foodItemId.toString()) && o.offerId
               );
               if (offer) {
                 item.offer = { offerId: offer.offerId };
@@ -282,7 +339,7 @@ router.put(
 
       // Calculate total amount for non-offer items
       for (const item of updatedItems) {
-        if (!offerItems.has(item.foodItem)) {
+        if (!offerItems.has(item.foodItemId)) {
           totalAmount += item.totalPrice;
         }
       }
@@ -303,12 +360,12 @@ router.put(
         cart,
       });
     } catch (error) {
-      handleError("/cart/update", "PUT", error, req, res);
+      handleError("/cart/update/:cartId", "PUT", error, req, res);
     }
   }
 );
 
-// @route   PUT /cart/get/:id
+// @route   GET /cart/get/:id
 // @desc    Get cart details by ID (Customer Only)
 // @access  PRIVATE (Customer Only)
 router.get(
