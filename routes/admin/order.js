@@ -138,7 +138,7 @@ router.get(
         return res.status(404).json({ message: messages.NO_ORDERS_FOUND });
       }
 
-      // Rename `customerId` to `customer` and `deliverDriverId` to `deliveryDriver` in the response
+      // Rename `customerId` to `customer` and `deliveryDriverId` to `deliveryDriver` in the response
       const renameFields = (order) => {
         if (order.customerId) {
           order.customer = order.customerId;
@@ -267,12 +267,12 @@ router.patch(
       if (errors) return res.status(400).json({ errors });
 
       const { id } = req.params;
-      const { status, deliverDriverId } = req.body;
+      const { status, deliveryDriverId } = req.body;
 
       // Validate that the employee is associated with the specified branch
       const validationResult = await validateEmployeeBranchAssociation(
         req.user.id, // Authenticated employee ID
-        branchId // Branch ID from request params
+        req.branchId // Branch ID from request params
       );
 
       if (!validationResult.isValid) {
@@ -282,7 +282,7 @@ router.patch(
       }
 
       // Validate that deliveryDriverId is provided if status is OUT_FOR_DELIVERY
-      if (status === OrderStatusses.OUT_FOR_DELIVERY && !deliverDriverId) {
+      if (status === OrderStatusses.OUT_FOR_DELIVERY && !deliveryDriverId) {
         return res.status(400).json({
           message: messages.DELIVERY_DRIVER_REQUIRED,
         });
@@ -302,8 +302,8 @@ router.patch(
       }
 
       // Associate delivery driver if availeble
-      if (deliverDriverId) {
-        updateData.deliverDriverId = deliverDriverId;
+      if (deliveryDriverId) {
+        updateData.deliveryDriverId = deliveryDriverId;
       }
 
       // Update the order

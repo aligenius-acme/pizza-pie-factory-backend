@@ -5,6 +5,7 @@ const CategorySchema = new Schema(
   {
     name: { type: String, required: true },
     imageUrl: { type: String },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

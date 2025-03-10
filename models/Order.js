@@ -10,6 +10,10 @@ const {
 
 const OrderSchema = new Schema(
   {
+    orderNumber: {
+      type: String,
+      unique: true,
+    },
     customerId: {
       type: Schema.Types.ObjectId,
       ref: "Customer",
@@ -142,6 +146,19 @@ const OrderSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// 🔹 Pre-save Hook to Generate Unique Order Number
+OrderSchema.pre("save", async function (next) {
+  if (!this.orderNumber) {
+    // Generate Order Number (Example: ORD-20250310-00123)
+    const today = new Date();
+    const datePart = today.toISOString().split("T")[0].replace(/-/g, ""); // YYYYMMDD
+    const randomNumber = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
+
+    this.orderNumber = `ORD-${datePart}-${randomNumber}`;
+  }
+  next();
+});
 
 // OrderSchema.virtual("deliveryDriverId", {
 //   ref: "Employee",

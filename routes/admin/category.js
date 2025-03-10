@@ -165,56 +165,75 @@ router.put(
   }
 );
 
-// @route   DELETE /admin/category/delete/:id
-// @desc    Delete a category (Admin Only)
-// @access  PRIVATE (Admin Only)
-router.delete(
-  "/admin/category/delete/:id",
-  authMiddleware.authenticateJWT, // Authenticate JWT
-  authMiddleware.authenticateAdmin, // Ensure user is an admin
-  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate category ID
-  async (req, res) => {
-    try {
-      // Validate request parameters
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// @route   GET /admin/categories
+// @desc    Get all categories
+// @access  PUBLIC
+router.get("/admin/categories", async (req, res) => {
+  try {
+    // Fetch all categories
+    const categories = await Category.find().lean();
 
-      const { id } = req.params;
-
-      // Check if the category has associated food items
-      const foodItems = await FoodItem.find({ categories: id }).lean();
-      if (foodItems.length > 0) {
-        return res.status(400).json({
-          message: messages.CATEGORY_HAS_FOOD_ITEMS,
-        });
-      }
-
-      // Find the category by ID
-      const category = await Category.findById(id).lean();
-      if (!category) {
-        return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
-      }
-
-      // Delete the category image from Cloudinary if it exists
-      if (category.imageUrl) {
-        await cloudinary.uploader.destroy(`categories/${category.name}`);
-      }
-
-      // Delete the category
-      await Category.findByIdAndDelete(id);
-
-      // Return success response
-      res.status(200).json({ message: messages.CATEGORY_DELETED_SUCCESS });
-    } catch (error) {
-      handleError(
-        `/admin/category/delete/${req.params.id}`,
-        "DELETE",
-        error,
-        req,
-        res
-      );
+    if (categories.length === 0) {
+      return res.status(404).json({ message: messages.NO_CATEGORIES_FOUND });
     }
+
+    // Return success response
+    res.status(200).json(categories);
+  } catch (error) {
+    handleError("/admin/categories", "GET", error, req, res);
   }
-);
+});
+
+// // @route   DELETE /admin/category/delete/:id
+// // @desc    Delete a category (Admin Only)
+// // @access  PRIVATE (Admin Only)
+// router.delete(
+//   "/admin/category/delete/:id",
+//   authMiddleware.authenticateJWT, // Authenticate JWT
+//   authMiddleware.authenticateAdmin, // Ensure user is an admin
+//   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate category ID
+//   async (req, res) => {
+//     try {
+//       // Validate request parameters
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
+
+//       const { id } = req.params;
+
+//       // Check if the category has associated food items
+//       const foodItems = await FoodItem.find({ categories: id }).lean();
+//       if (foodItems.length > 0) {
+//         return res.status(400).json({
+//           message: messages.CATEGORY_HAS_FOOD_ITEMS,
+//         });
+//       }
+
+//       // Find the category by ID
+//       const category = await Category.findById(id).lean();
+//       if (!category) {
+//         return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+//       }
+
+//       // Delete the category image from Cloudinary if it exists
+//       if (category.imageUrl) {
+//         await cloudinary.uploader.destroy(`categories/${category.name}`);
+//       }
+
+//       // Delete the category
+//       await Category.findByIdAndDelete(id);
+
+//       // Return success response
+//       res.status(200).json({ message: messages.CATEGORY_DELETED_SUCCESS });
+//     } catch (error) {
+//       handleError(
+//         `/admin/category/delete/${req.params.id}`,
+//         "DELETE",
+//         error,
+//         req,
+//         res
+//       );
+//     }
+//   }
+// );
 
 module.exports = router;
