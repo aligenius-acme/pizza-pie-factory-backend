@@ -165,6 +165,27 @@ router.put(
   }
 );
 
+// @route   GET /admin/category/:id
+// @desc    Get a category by ID
+// @access  PUBLIC
+router.get("/admin/category/:id", async (req, res) => {
+  try {
+    const categoryId = req.params.id;
+
+    // Fetch the category by ID
+    const category = await Category.findById(categoryId).lean();
+
+    if (!category) {
+      return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+    }
+
+    // Return success response
+    res.status(200).json(category);
+  } catch (error) {
+    handleError("/admin/category/:id", "GET", error, req, res);
+  }
+});
+
 // @route   GET /admin/categories
 // @desc    Get all categories
 // @access  PUBLIC
