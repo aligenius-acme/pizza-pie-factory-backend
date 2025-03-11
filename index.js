@@ -58,6 +58,7 @@ app.use(passport.initialize());
 
 // Available Routes
 app.use("/api", require("./routes/admin/employee"));
+app.use("/api", require("./routes/admin/fooditem"));
 app.use("/api", require("./routes/admin/customer"));
 app.use("/api", require("./routes/admin/order"));
 app.use("/api", require("./routes/admin/employeeMessage"));
