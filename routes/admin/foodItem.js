@@ -3,6 +3,7 @@ const { param, query } = require("express-validator");
 const FoodItem = require("../../models/FoodItem");
 const Order = require("../../models/Order");
 const Category = require("../../models/Category");
+const Customization = require("../../models/Customization");
 const mongoose = require("mongoose");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
@@ -75,28 +76,36 @@ router.post(
         return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
       }
 
-      console.log();
-
       // Parse and validate customizations
+      // let customizations = filteredBody.customizations;
+      // if (typeof customizations === "string") {
+      //   try {
+      //     customizations = JSON.parse(customizations);
+      //     for (let customization of customizations) {
+      //       if (
+      //         !customization.customization ||
+      //         !isValidObjectId(customization.customization)
+      //       ) {
+      //         return res
+      //           .status(400)
+      //           .json({ message: messages.INVALID_CUSTOMIZATION_ID });
+      //       }
+      //       if (typeof customization.isInOffer !== "boolean") {
+      //         return res
+      //           .status(400)
+      //           .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+      //       }
+      //     }
+      //   } catch (err) {
+      //     return res
+      //       .status(400)
+      //       .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+      //   }
+      // }
       let customizations = filteredBody.customizations;
       if (typeof customizations === "string") {
         try {
           customizations = JSON.parse(customizations);
-          for (let customization of customizations) {
-            if (
-              !customization.customization ||
-              !isValidObjectId(customization.customization)
-            ) {
-              return res
-                .status(400)
-                .json({ message: messages.INVALID_CUSTOMIZATION_ID });
-            }
-            if (typeof customization.isInOffer !== "boolean") {
-              return res
-                .status(400)
-                .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
-            }
-          }
         } catch (err) {
           return res
             .status(400)
@@ -112,20 +121,29 @@ router.post(
         filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
       }
 
-      for (let customization of customizations) {
-        if (
-          !customization.customization ||
-          !isValidObjectId(customization.customization)
-        ) {
-          return res
-            .status(400)
-            .json({ message: messages.INVALID_CUSTOMIZATION_ID });
-        }
-        if (typeof customization.isInOffer !== "boolean") {
-          return res
-            .status(400)
-            .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
-        }
+      // for (let customization of customizations) {
+      //   if (
+      //     !customization.customization ||
+      //     !isValidObjectId(customization.customization)
+      //   ) {
+      //     return res
+      //       .status(400)
+      //       .json({ message: messages.INVALID_CUSTOMIZATION_ID });
+      //   }
+      //   if (typeof customization.isInOffer !== "boolean") {
+      //     return res
+      //       .status(400)
+      //       .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+      //   }
+      // }
+      const existingCustomizations = await Customization.find({
+        _id: { $in: customizations },
+      }).lean();
+
+      if (existingCustomizations.length !== categories.length) {
+        return res
+          .status(400)
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
       }
 
       // Check if food item with the same name already exists
@@ -262,25 +280,37 @@ router.put(
       }
 
       // Parse and validate customizations
-      let customizations = filteredBody.customizations;
-      if (typeof customizations === "string") {
+      // let customizations = filteredBody.customizations;
+      // if (typeof customizations === "string") {
+      //   try {
+      //     customizations = JSON.parse(customizations);
+      //     for (let customization of customizations) {
+      //       if (
+      //         !customization.customization ||
+      //         !isValidObjectId(customization.customization)
+      //       ) {
+      //         return res
+      //           .status(400)
+      //           .json({ message: messages.INVALID_CUSTOMIZATION_ID });
+      //       }
+      //       if (typeof customization.isInOffer !== "boolean") {
+      //         return res
+      //           .status(400)
+      //           .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+      //       }
+      //     }
+      //   } catch (err) {
+      //     return res
+      //       .status(400)
+      //       .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+      //   }
+      // }
+      if (
+        filteredBody.customizations &&
+        typeof filteredBody.customizations === "string"
+      ) {
         try {
-          customizations = JSON.parse(customizations);
-          for (let customization of customizations) {
-            if (
-              !customization.customization ||
-              !isValidObjectId(customization.customization)
-            ) {
-              return res
-                .status(400)
-                .json({ message: messages.INVALID_CUSTOMIZATION_ID });
-            }
-            if (typeof customization.isInOffer !== "boolean") {
-              return res
-                .status(400)
-                .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
-            }
-          }
+          filteredBody.customizations = JSON.parse(filteredBody.customizations);
         } catch (err) {
           return res
             .status(400)
@@ -289,20 +319,32 @@ router.put(
       }
 
       // Check if all customizations exist
-      if (customizations) {
-        const customizationIds = customizations.map((c) => c.customization);
-        const existingCustomizations = await Customization.find({
-          _id: { $in: customizationIds },
-        }).lean();
+      // if (customizations) {
+      //   const customizationIds = customizations.map((c) => c.customization);
+      //   const existingCustomizations = await Customization.find({
+      //     _id: { $in: customizationIds },
+      //   }).lean();
 
-        if (existingCustomizations.length !== customizationIds.length) {
-          return res
-            .status(400)
-            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
-        }
+      //   if (existingCustomizations.length !== customizationIds.length) {
+      //     return res
+      //       .status(400)
+      //       .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+      //   }
+      // }
+      // filteredBody.customizations = customizations;
+      // Check if all categories exist
+      const existingCustomizations = await Customization.find({
+        _id: { $in: filteredBody.customizations || [] },
+      }).lean();
+
+      if (
+        filteredBody.customizations &&
+        existingCustomizations.length !== filteredBody.customizations.length
+      ) {
+        return res
+          .status(400)
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
       }
-
-      filteredBody.customizations = customizations;
 
       // Upload new image to Cloudinary if provided
       if (req.file) {
@@ -543,9 +585,6 @@ router.get(
         filter.createdAt = { $gte: startOfDay, $lte: endOfDay }; // Filter by createdAt date
       }
 
-      // Log the filter for debugging
-      console.log("Filter:", filter);
-
       // Find all food items matching the filter
       const foodItemsQuery = FoodItem.find(filter)
         .sort({ [sortBy]: sortOrder }) // Sort by the specified field
@@ -557,8 +596,7 @@ router.get(
         foodItemsQuery
           .populate("categories") // Populate categories
           .populate({
-            path: "customizations.customization", // Populate nested customization details
-            model: "Customization", // Reference the Customization model
+            path: "customizations", // Populate nested customization details
           });
       }
 
@@ -591,51 +629,51 @@ router.get(
 // @route   DELETE /admin/fooditem/delete/:id
 // @desc    Delete a food item (Admin Only)
 // @access  PRIVATE (Admin Only)
-router.delete(
-  "/admin/fooditem/delete/:id",
-  authMiddleware.authenticateJWT, // Authenticate JWT
-  authMiddleware.authenticateAdmin, // Ensure user is an admin
-  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate food item ID
-  async (req, res) => {
-    try {
-      // Validate request parameters
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// router.delete(
+//   "/admin/fooditem/delete/:id",
+//   authMiddleware.authenticateJWT, // Authenticate JWT
+//   authMiddleware.authenticateAdmin, // Ensure user is an admin
+//   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate food item ID
+//   async (req, res) => {
+//     try {
+//       // Validate request parameters
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+//       const { id } = req.params;
 
-      // Check if the food item is referenced in any orders
-      const orders = await Order.find({ "items.foodItemId": id }).lean();
-      if (orders.length > 0) {
-        return res.status(400).json({ message: messages.FOOD_ITEM_HAS_ORDERS });
-      }
+//       // Check if the food item is referenced in any orders
+//       const orders = await Order.find({ "items.foodItemId": id }).lean();
+//       if (orders.length > 0) {
+//         return res.status(400).json({ message: messages.FOOD_ITEM_HAS_ORDERS });
+//       }
 
-      // Find the food item by ID
-      const foodItem = await FoodItem.findById(id).lean();
-      if (!foodItem) {
-        return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
-      }
+//       // Find the food item by ID
+//       const foodItem = await FoodItem.findById(id).lean();
+//       if (!foodItem) {
+//         return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
+//       }
 
-      // Delete the food item image from Cloudinary if it exists
-      if (foodItem.imageUrl) {
-        await cloudinary.uploader.destroy(`foodItems/${foodItem.name}`);
-      }
+//       // Delete the food item image from Cloudinary if it exists
+//       if (foodItem.imageUrl) {
+//         await cloudinary.uploader.destroy(`foodItems/${foodItem.name}`);
+//       }
 
-      // Delete the food item
-      await FoodItem.findByIdAndDelete(id);
+//       // Delete the food item
+//       await FoodItem.findByIdAndDelete(id);
 
-      // Return success response
-      res.status(200).json({ message: messages.FOOD_ITEM_DELETED_SUCCESS });
-    } catch (error) {
-      handleError(
-        `/admin/fooditem/delete/${req.params.id}`,
-        "DELETE",
-        error,
-        req,
-        res
-      );
-    }
-  }
-);
+//       // Return success response
+//       res.status(200).json({ message: messages.FOOD_ITEM_DELETED_SUCCESS });
+//     } catch (error) {
+//       handleError(
+//         `/admin/fooditem/delete/${req.params.id}`,
+//         "DELETE",
+//         error,
+//         req,
+//         res
+//       );
+//     }
+//   }
+// );
 
 module.exports = router;

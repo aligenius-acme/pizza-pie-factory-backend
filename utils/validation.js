@@ -897,6 +897,34 @@ const foodItemValidation = () => [
     .isObject() // Ensure the value is an object after sanitization
     .withMessage(foodItemMessages.foodItem.nutritionalInfo.invalid),
 
+  // body("customizations")
+  //   .optional({ checkFalsy: true })
+  //   .customSanitizer((value) => {
+  //     // If value is a string, try to parse it as JSON
+  //     if (typeof value === "string") {
+  //       try {
+  //         return JSON.parse(value);
+  //       } catch (err) {
+  //         return value; // Return the original value if parsing fails
+  //       }
+  //     }
+  //     return value; // Return the original value if it's not a string
+  //   })
+  //   .isArray()
+  //   .withMessage(foodItemMessages.foodItem.customizations.invalid),
+  // body("customizations.*.customization")
+  //   .notEmpty()
+  //   .withMessage(
+  //     foodItemMessages.foodItem.customizations.customizationId.required
+  //   )
+  //   .isMongoId()
+  //   .withMessage(
+  //     foodItemMessages.foodItem.customizations.customizationId.invalid
+  //   ),
+  // body("customizations.*.isInOffer")
+  //   .optional({ checkFalsy: true })
+  //   .isBoolean()
+  //   .withMessage(foodItemMessages.foodItem.customizations.isInOffer.invalid),
   body("customizations")
     .optional({ checkFalsy: true })
     .customSanitizer((value) => {
@@ -912,19 +940,6 @@ const foodItemValidation = () => [
     })
     .isArray()
     .withMessage(foodItemMessages.foodItem.customizations.invalid),
-  body("customizations.*.customization")
-    .notEmpty()
-    .withMessage(
-      foodItemMessages.foodItem.customizations.customizationId.required
-    )
-    .isMongoId()
-    .withMessage(
-      foodItemMessages.foodItem.customizations.customizationId.invalid
-    ),
-  body("customizations.*.isInOffer")
-    .optional({ checkFalsy: true })
-    .isBoolean()
-    .withMessage(foodItemMessages.foodItem.customizations.isInOffer.invalid),
 
   body("imageUrl")
     .optional({ checkFalsy: true })
