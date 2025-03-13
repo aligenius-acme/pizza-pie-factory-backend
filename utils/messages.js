@@ -132,4 +132,14 @@ module.exports = {
   // Order tracking messages
   PHONE_NUMBER_OR_ORDER_ID_REQUIRED: "Phone number or order id required",
   ORDER_FETCHED_SUCCESS: "Order successfully fetched",
+
+  // Search messages
+  VALIDATE_SEARCH_FOOD_ITEMS_BY_CATEGORYIDS_EMPTY:
+    "CategoryIds must be a string",
+  VALIDATE_SEARCH_FOOD_ITEMS_BY_CATEGORYIDS_INVALID:
+    "CategoryIds must be a comma-separated list of valid MongoDB ObjectIds",
+  VALIDATE_SEARCH_FOOD_ITEMS_BY_CUSTOMIZATIONIDS_EMPTY:
+    "CustomizationIds must be a string",
+  VALIDATE_SEARCH_FOOD_ITEMS_BY_CUSTOMIZATIONIDS_INVALID:
+    "CustomizationIds must be a comma-separated list of valid MongoDB ObjectIds",
 };
