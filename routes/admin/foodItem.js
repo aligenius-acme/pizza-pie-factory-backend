@@ -75,11 +75,28 @@ router.post(
         return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
       }
 
+      console.log();
+
       // Parse and validate customizations
       let customizations = filteredBody.customizations;
       if (typeof customizations === "string") {
         try {
           customizations = JSON.parse(customizations);
+          for (let customization of customizations) {
+            if (
+              !customization.customization ||
+              !isValidObjectId(customization.customization)
+            ) {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION_ID });
+            }
+            if (typeof customization.isInOffer !== "boolean") {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+            }
+          }
         } catch (err) {
           return res
             .status(400)
@@ -131,11 +148,7 @@ router.post(
             ? JSON.parse(filteredBody.nutritionalInfo)
             : {}
           : {},
-        customizations: filteredBody.customizations
-          ? isValidJSON(filteredBody.customizations)
-            ? JSON.parse(filteredBody.customizations)
-            : []
-          : [],
+        customizations: customizations || [],
       };
 
       // Upload image to Cloudinary if provided
@@ -253,6 +266,21 @@ router.put(
       if (typeof customizations === "string") {
         try {
           customizations = JSON.parse(customizations);
+          for (let customization of customizations) {
+            if (
+              !customization.customization ||
+              !isValidObjectId(customization.customization)
+            ) {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION_ID });
+            }
+            if (typeof customization.isInOffer !== "boolean") {
+              return res
+                .status(400)
+                .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+            }
+          }
         } catch (err) {
           return res
             .status(400)
@@ -260,25 +288,21 @@ router.put(
         }
       }
 
-      for (let customization of customizations) {
-        if (
-          !customization.customization ||
-          !isValidObjectId(customization.customization)
-        ) {
+      // Check if all customizations exist
+      if (customizations) {
+        const customizationIds = customizations.map((c) => c.customization);
+        const existingCustomizations = await Customization.find({
+          _id: { $in: customizationIds },
+        }).lean();
+
+        if (existingCustomizations.length !== customizationIds.length) {
           return res
             .status(400)
-            .json({ message: messages.INVALID_CUSTOMIZATION_ID });
-        }
-        if (typeof customization.isInOffer !== "boolean") {
-          return res
-            .status(400)
-            .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
+            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
         }
       }
 
-      if (filteredBody.customizations) {
-        filteredBody.customizations = JSON.parse(customizations);
-      }
+      filteredBody.customizations = customizations;
 
       // Upload new image to Cloudinary if provided
       if (req.file) {

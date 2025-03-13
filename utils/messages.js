@@ -142,4 +142,11 @@ module.exports = {
     "CustomizationIds must be a string",
   VALIDATE_SEARCH_FOOD_ITEMS_BY_CUSTOMIZATIONIDS_INVALID:
     "CustomizationIds must be a comma-separated list of valid MongoDB ObjectIds",
+
+  // Customization messages
+  CUSTOMIZATION_NOT_FOUND: "One or more customizations do not exist ",
+  CUSTOMIZATION_EXISTS: "Customization with this name already exists",
+  CUSTOMIZATION_REGISTRATION_SUCCESS: "Customization registered successfully",
+  CUSTOMIZATION_NOT_FOUND: "Customization not found",
+  CUSTOMIZATION_UPDATE_SUCCESS: "Customization updated successfully",
 };
