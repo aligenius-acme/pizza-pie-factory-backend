@@ -27,6 +27,7 @@ const CustomizationSchema = new Schema(
         ],
       },
     ],
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

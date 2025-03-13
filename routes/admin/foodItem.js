@@ -13,6 +13,7 @@ const {
   validateRequest,
   stripUnwantedFields,
   handleError,
+  isValidJSON,
 } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 
@@ -86,6 +87,14 @@ router.post(
         }
       }
 
+      // Parse nutritional info if provided
+      if (
+        filteredBody.nutritionalInfo &&
+        typeof filteredBody.nutritionalInfo === "string"
+      ) {
+        filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
+      }
+
       for (let customization of customizations) {
         if (
           !customization.customization ||
@@ -118,11 +127,15 @@ router.post(
         categories: categories,
         ingredients: filteredBody.ingredients,
         nutritionalInfo: filteredBody.nutritionalInfo
-          ? JSON.parse(filteredBody.nutritionalInfo)
+          ? isValidJSON(filteredBody.nutritionalInfo)
+            ? JSON.parse(filteredBody.nutritionalInfo)
+            : {}
           : {},
         customizations: filteredBody.customizations
-          ? JSON.parse(filteredBody.customizations)
-          : {},
+          ? isValidJSON(filteredBody.customizations)
+            ? JSON.parse(filteredBody.customizations)
+            : []
+          : [],
       };
 
       // Upload image to Cloudinary if provided
@@ -220,7 +233,7 @@ router.put(
       }
 
       // Find the food item by ID
-      const foodItem = await FoodItem.findById(id).lean();
+      const foodItem = await FoodItem.findById(id);
       if (!foodItem) {
         return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
       }
@@ -228,7 +241,10 @@ router.put(
       const oldName = foodItem.name;
 
       // Parse nutritional info if provided
-      if (filteredBody.nutritionalInfo) {
+      if (
+        filteredBody.nutritionalInfo &&
+        typeof filteredBody.nutritionalInfo === "string"
+      ) {
         filteredBody.nutritionalInfo = JSON.parse(filteredBody.nutritionalInfo);
       }
 
@@ -274,7 +290,7 @@ router.put(
         const uploadStream = () =>
           new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-              { folder: "foodItems", public_id: filteredBody.name },
+              { folder: "foodItems", public_id: filteredBody.name || oldName },
               (error, result) => {
                 if (result) resolve(result);
                 else reject(error);

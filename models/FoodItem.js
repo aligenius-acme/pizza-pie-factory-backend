@@ -24,6 +24,7 @@ const FoodItemSchema = new Schema(
     },
     customizations: [CustomizationSchema],
     imageUrl: { type: String },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

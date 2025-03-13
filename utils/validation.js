@@ -882,8 +882,19 @@ const foodItemValidation = () => [
     .withMessage(foodItemMessages.foodItem.ingredients.invalid),
 
   body("nutritionalInfo")
-    .optional({ checkFalsy: true })
-    .isObject()
+    .optional({ checkFalsy: true }) // Allow the field to be optional
+    .customSanitizer((value) => {
+      // If value is a string, try to parse it as JSON
+      if (typeof value === "string") {
+        try {
+          return JSON.parse(value);
+        } catch (err) {
+          return value; // Return the original value if parsing fails
+        }
+      }
+      return value; // Return the original value if it's not a string
+    })
+    .isObject() // Ensure the value is an object after sanitization
     .withMessage(foodItemMessages.foodItem.nutritionalInfo.invalid),
 
   body("customizations")

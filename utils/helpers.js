@@ -239,6 +239,19 @@ const validateEmployeeBranchAssociation = async (employeeId, branchId) => {
   }
 };
 
+// Utility function to check if a string is valid JSON
+
+const isValidJSON = (str) => {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+module.exports = { isValidJSON };
+
 module.exports = {
   generateToken,
   validateRequest,
@@ -253,4 +266,5 @@ module.exports = {
   encrypt,
   decrypt,
   validateEmployeeBranchAssociation,
+  isValidJSON,
 };
