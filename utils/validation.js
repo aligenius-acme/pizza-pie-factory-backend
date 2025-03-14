@@ -1048,7 +1048,18 @@ const offerValidation = () => [
   body("categories")
     .notEmpty()
     .withMessage(offerMessages.categories.required)
-    .isArray({ min: 1 })
+    .customSanitizer((value) => {
+      // If value is a string, try to parse it as JSON
+      if (typeof value === "string") {
+        try {
+          return JSON.parse(value);
+        } catch (err) {
+          return value; // Return the original value if parsing fails
+        }
+      }
+      return value; // Return the original value if it's not a string
+    })
+    .isArray()
     .withMessage(offerMessages.categories.invalid),
 
   body("offerPrice")

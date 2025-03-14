@@ -1,5 +1,5 @@
 const express = require("express");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const Customization = require("../../models/Customization");
 const authMiddleware = require("../../middleware/auth");
 const { customizationValidation } = require("../../utils/validation");
@@ -92,7 +92,7 @@ router.put(
       if (!customization) {
         return res
           .status(404)
-          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
       }
 
       // Return success response
@@ -133,7 +133,7 @@ router.get(
       if (!customization) {
         return res
           .status(404)
-          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
       }
 
       // Return success response
@@ -157,13 +157,104 @@ router.get(
   "/admin/customizations",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [
+    query("id").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate ID (optional)
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
+    query("sortBy").optional().isString(), // Validate sortBy (optional)
+    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
+    query("isActive").optional().isBoolean(), // Validate isActive (optional)
+    query("startDate").optional().isISO8601(), // Validate startDate (optional)
+    query("endDate").optional().isISO8601(), // Validate endDate (optional)
+    query("search").optional().isString(), // Validate search keyword (optional)
+  ],
   async (req, res) => {
     try {
-      // Fetch all customizations
-      const customizations = await Customization.find().lean();
+      // Validate request query parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-      // Return success response
-      res.status(200).json(customizations);
+      const {
+        id,
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        order = "desc",
+        isActive,
+        startDate,
+        endDate,
+        search,
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      // Build filter object
+      let filter = {};
+
+      // Filter by ID
+      if (id) {
+        filter._id = id;
+      }
+
+      // Filter by isActive status
+      if (isActive !== undefined) {
+        filter.isActive = isActive;
+      }
+
+      // Filter by date range
+      if (startDate && endDate) {
+        filter.createdAt = {
+          $gte: new Date(startDate), // Greater than or equal to startDate
+          $lte: new Date(endDate), // Less than or equal to endDate
+        };
+      } else if (startDate) {
+        filter.createdAt = {
+          $gte: new Date(startDate), // Greater than or equal to startDate
+        };
+      } else if (endDate) {
+        filter.createdAt = {
+          $lte: new Date(endDate), // Less than or equal to endDate
+        };
+      }
+
+      // Add search functionality
+      if (search) {
+        const searchRegex = new RegExp(search, "i"); // Case-insensitive search
+        filter.$or = [
+          { name: { $regex: searchRegex } }, // Search by name
+          { description: { $regex: searchRegex } }, // Search by description
+        ];
+      }
+
+      // Fetch customizations with pagination and sorting
+      const customizations = await Customization.find(filter)
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
+        .lean();
+
+      if (!customizations || customizations.length === 0) {
+        return res
+          .status(404)
+          .json({ message: messages.NO_CUSTOMIZATIONS_FOUND });
+      }
+
+      // Get the total count of customizations
+      const totalCount = await Customization.countDocuments(filter);
+
+      // Return success response with customizations and pagination details
+      res.status(200).json({
+        success: true,
+        data: customizations,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
     } catch (error) {
       handleError("/admin/customizations", "GET", error, req, res);
     }

@@ -144,10 +144,10 @@ module.exports = {
     "CustomizationIds must be a comma-separated list of valid MongoDB ObjectIds",
 
   // Customization messages
-  CUSTOMIZATION_NOT_FOUND: "One or more customizations do not exist",
+  CUSTOMIZATION_NOT_FOUND_OR_INACTIVE:
+    "One or more customizations do not exist or inactive",
   CUSTOMIZATION_EXISTS: "Customization with this name already exists",
   CUSTOMIZATION_REGISTRATION_SUCCESS: "Customization registered successfully",
-  CUSTOMIZATION_NOT_FOUND: "Customization not found",
   CUSTOMIZATION_UPDATE_SUCCESS: "Customization updated successfully",
 
   // Offer messages

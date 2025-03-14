@@ -41,6 +41,7 @@ router.post(
         // Fetch customizations from the database
         const customizations = await Customization.find({
           _id: { $in: item.customizations.map((c) => c.customization) },
+          isActive: true,
         });
 
         // Calculate item total price using the price from the database
@@ -225,6 +226,7 @@ router.put(
         // Fetch customizations from the database
         const customizations = await Customization.find({
           _id: { $in: item.customizations.map((c) => c.customization) },
+          isActive: true,
         });
 
         // Calculate item total price using the price from the database

@@ -137,13 +137,13 @@ router.post(
       //   }
       // }
       const existingCustomizations = await Customization.find({
-        _id: { $in: customizations },
+        _id: { $in: customizations, isActive: true },
       }).lean();
 
       if (existingCustomizations.length !== customizations.length) {
         return res
           .status(400)
-          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
       }
 
       // Check if food item with the same name already exists
@@ -328,13 +328,14 @@ router.put(
       //   if (existingCustomizations.length !== customizationIds.length) {
       //     return res
       //       .status(400)
-      //       .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+      //       .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
       //   }
       // }
       // filteredBody.customizations = customizations;
       // Check if all categories exist
       const existingCustomizations = await Customization.find({
         _id: { $in: filteredBody.customizations || [] },
+        isActive: true,
       }).lean();
 
       if (
@@ -343,7 +344,7 @@ router.put(
       ) {
         return res
           .status(400)
-          .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+          .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
       }
 
       // Upload new image to Cloudinary if provided

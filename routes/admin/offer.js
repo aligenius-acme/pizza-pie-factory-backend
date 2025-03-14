@@ -70,11 +70,12 @@ router.post(
         }
         const existingCustomizations = await Customization.find({
           _id: { $in: customizations },
+          isActive: true,
         }).lean();
         if (existingCustomizations.length !== customizations.length) {
           return res
             .status(400)
-            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+            .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
         }
       }
 
@@ -205,11 +206,12 @@ router.put(
         }
         const existingCustomizations = await Customization.find({
           _id: { $in: customizations },
+          isActive: true,
         }).lean();
         if (existingCustomizations.length !== customizations.length) {
           return res
             .status(400)
-            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
+            .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
         }
         filteredBody.customizations = customizations;
       }
