@@ -27,7 +27,7 @@ router.get("/categories", async (req, res) => {
 
 // @route   GET /category/get/:id
 // @desc    Get category details by ID
-// @access  PRIVATE (Authenticated Users Only)
+// @access  PUBLIC
 router.get(
   "/category/get/:id",
   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate category ID
@@ -52,7 +52,7 @@ router.get(
       // Return success response
       res.status(200).json(category);
     } catch (error) {
-      handleError("/categories", "GET", error, req, res);
+      handleError(`/category/get/${req.params.id}`, "GET", error, req, res);
     }
   }
 );

@@ -7,6 +7,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 
 const updateAnalytics = require("./scripts/jobs/analyticsJob");
+const checkOfferValidity = require("./scripts/jobs/offersJob");
 
 connectToMongo();
 
@@ -73,6 +74,7 @@ app.use("/api", require("./routes/customer"));
 app.use("/api", require("./routes/cart"));
 app.use("/api", require("./routes/order"));
 app.use("/api", require("./routes/category"));
+app.use("/api", require("./routes/offer"));
 app.use("/api", require("./routes/foodItem"));
 
 server.listen(port, () => {
@@ -80,3 +82,4 @@ server.listen(port, () => {
 });
 
 updateAnalytics();
+checkOfferValidity();

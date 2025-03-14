@@ -54,7 +54,7 @@ router.post(
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for customizations" });
+            .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
         }
       }
 
@@ -66,7 +66,7 @@ router.post(
         ) {
           return res
             .status(400)
-            .json({ error: "Invalid customization ID(s) provided" });
+            .json({ message: messages.INVALID_CUSTOMIZATION_ID });
         }
         const existingCustomizations = await Customization.find({
           _id: { $in: customizations },
@@ -74,7 +74,7 @@ router.post(
         if (existingCustomizations.length !== customizations.length) {
           return res
             .status(400)
-            .json({ error: "One or more customizations do not exist" });
+            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
         }
       }
 
@@ -86,7 +86,7 @@ router.post(
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for categories" });
+            .json({ message: messages.INVALID_CATEGORY_FORMAT });
         }
       }
 
@@ -96,15 +96,13 @@ router.post(
         if (!categories.every((id) => mongoose.Types.ObjectId.isValid(id))) {
           return res
             .status(400)
-            .json({ error: "Invalid category ID(s) provided" });
+            .json({ message: messages.INVALID_CATEGORY_ID });
         }
         const existingCategories = await Category.find({
           _id: { $in: categories },
         }).lean();
         if (existingCategories.length !== categories.length) {
-          return res
-            .status(400)
-            .json({ error: "One or more categories do not exist" });
+          return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
         }
       }
 
@@ -113,9 +111,7 @@ router.post(
         name: filteredBody.name,
       }).lean();
       if (existingOffer) {
-        return res
-          .status(400)
-          .json({ message: "Offer with this name already exists" });
+        return res.status(400).json({ message: messages.OFFER_EXISTS });
       }
 
       // Prepare offer data
@@ -193,7 +189,7 @@ router.put(
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for customizations" });
+            .json({ message: messages.INVALID_CUSTOMIZATION_FORMAT });
         }
       }
 
@@ -205,7 +201,7 @@ router.put(
         ) {
           return res
             .status(400)
-            .json({ error: "Invalid customization ID(s) provided" });
+            .json({ message: messages.INVALID_CUSTOMIZATION_ID });
         }
         const existingCustomizations = await Customization.find({
           _id: { $in: customizations },
@@ -213,7 +209,7 @@ router.put(
         if (existingCustomizations.length !== customizations.length) {
           return res
             .status(400)
-            .json({ error: "One or more customizations do not exist" });
+            .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
         }
         filteredBody.customizations = customizations;
       }
@@ -226,7 +222,7 @@ router.put(
         } catch (err) {
           return res
             .status(400)
-            .json({ error: "Invalid format for categories" });
+            .json({ message: messages.INVALID_CATEGORY_FORMAT });
         }
       }
 
@@ -236,15 +232,13 @@ router.put(
         if (!categories.every((id) => mongoose.Types.ObjectId.isValid(id))) {
           return res
             .status(400)
-            .json({ error: "Invalid category ID(s) provided" });
+            .json({ message: messages.INVALID_CATEGORY_ID });
         }
         const existingCategories = await Category.find({
           _id: { $in: categories },
         }).lean();
         if (existingCategories.length !== categories.length) {
-          return res
-            .status(400)
-            .json({ error: "One or more categories do not exist" });
+          return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
         }
         filteredBody.categories = categories;
       }
@@ -256,9 +250,7 @@ router.put(
           _id: { $ne: id },
         }).lean();
         if (existingOffer) {
-          return res
-            .status(400)
-            .json({ message: "Offer with this name already exists" });
+          return res.status(400).json({ message: messages.OFFER_EXISTS });
         }
       }
 
@@ -309,7 +301,7 @@ router.put(
 router.get(
   "/admin/offer/get/:id",
   authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage("Invalid offer ID")],
+  [param("id").isMongoId().withMessage(messages.INVALID_OFFER_ID)],
   async (req, res) => {
     try {
       // Validate request parameters
@@ -325,7 +317,7 @@ router.get(
         .lean();
 
       if (!offer) {
-        return res.status(404).json({ message: "Offer not found" });
+        return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
       }
 
       // Return success response

@@ -140,7 +140,7 @@ router.post(
         _id: { $in: customizations },
       }).lean();
 
-      if (existingCustomizations.length !== categories.length) {
+      if (existingCustomizations.length !== customizations.length) {
         return res
           .status(400)
           .json({ message: messages.CUSTOMIZATION_NOT_FOUND });
