@@ -41,7 +41,9 @@ router.get(
       // Find the category by ID
       let category = await Category.findById(id).lean();
       if (!category) {
-        return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+        return res
+          .status(404)
+          .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
       }
 
       // Populate items if they exist

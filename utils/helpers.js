@@ -5,7 +5,7 @@ const { validationResult } = require("express-validator");
 const messages = require("../utils/messages");
 const crypto = require("crypto");
 const ErrorLog = require("../models/ErrorLog");
-const { Roles } = require("../utils/enums"); // Import Roles from enums
+const { Roles, BranchOpeningDays } = require("../utils/enums"); // Import Roles from enums
 const Employee = require("../models/Employee");
 const { JWT_SECRET, JWT_EXPIRY } = process.env;
 
@@ -97,8 +97,15 @@ const logError = async (
 // Utility function to strip unwanted fields
 const stripUnwantedFields = (body, schema) => {
   const schemaPaths = Object.keys(schema.paths);
+
+  // Helper function to check if a key is valid
+  const isValidKey = (key) => {
+    return schemaPaths.some((path) => path.startsWith(key));
+  };
+
+  // Filter the body to include only valid keys
   return Object.fromEntries(
-    Object.entries(body).filter(([key]) => schemaPaths.includes(key))
+    Object.entries(body).filter(([key]) => isValidKey(key))
   );
 };
 
@@ -118,6 +125,7 @@ const handleError = async (route, method, error, req, res) => {
 
 // Helper function to validate time format (HH:MM)
 const isValidTime = (time) => {
+  if (time === "Closed") return true; // Allow "Closed" as a valid value
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
   return timeRegex.test(time);
 };
@@ -127,30 +135,44 @@ const validateOpeningTimings = (openingTimings) => {
   const days = new Set(); // To track unique days
 
   for (const timing of openingTimings) {
+    console.log(`Validating timing: ${JSON.stringify(timing)}`); // Debugging
+
+    // Check if required fields are present
+    if (!timing.day || !timing.openingTime || !timing.closingTime) {
+      throw new Error("Missing required fields in openingTimings.");
+    }
+
     // Check if the day is valid
     if (!Object.values(BranchOpeningDays).includes(timing.day)) {
-      throw new Error(messages.INVALID_DAY);
+      throw new Error(`Invalid day: ${timing.day}`);
     }
 
     // Check if the day is unique
     if (days.has(timing.day)) {
-      throw new Error(messages.DUPLICATE_DAY);
+      throw new Error(`Duplicate day: ${timing.day}`);
     }
     days.add(timing.day);
 
     // Check if openingTime and closingTime are valid
     if (!isValidTime(timing.openingTime)) {
-      throw new Error(messages.INVALID_TIME_FORMAT);
+      throw new Error(`Invalid openingTime: ${timing.openingTime}`);
     }
     if (!isValidTime(timing.closingTime)) {
-      throw new Error(messages.INVALID_TIME_FORMAT);
+      throw new Error(`Invalid closingTime: ${timing.closingTime}`);
+    }
+
+    // Skip time comparison if the branch is closed
+    if (timing.openingTime === "Closed" && timing.closingTime === "Closed") {
+      continue;
     }
 
     // Check if closingTime is after openingTime
     const opening = new Date(`1970-01-01T${timing.openingTime}:00`);
     const closing = new Date(`1970-01-01T${timing.closingTime}:00`);
     if (closing <= opening) {
-      throw new Error(messages.CLOSING_BEFORE_OPENING);
+      throw new Error(
+        `Closing time must be after opening time for ${timing.day}`
+      );
     }
   }
 };

@@ -73,7 +73,9 @@ router.post(
       }).lean();
 
       if (existingCategories.length !== categories.length) {
-        return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
+        return res
+          .status(400)
+          .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
       }
 
       // Parse and validate customizations
@@ -137,7 +139,8 @@ router.post(
       //   }
       // }
       const existingCustomizations = await Customization.find({
-        _id: { $in: customizations, isActive: true },
+        _id: { $in: customizations },
+        isActive: true,
       }).lean();
 
       if (existingCustomizations.length !== customizations.length) {
@@ -260,13 +263,17 @@ router.put(
         filteredBody.categories &&
         existingCategories.length !== filteredBody.categories.length
       ) {
-        return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
+        return res
+          .status(400)
+          .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
       }
 
       // Find the food item by ID
       const foodItem = await FoodItem.findById(id);
       if (!foodItem) {
-        return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
+        return res
+          .status(404)
+          .json({ message: messages.FOOD_ITEM_NOT_FOUND_OR_INACTIVE });
       }
 
       const oldName = foodItem.name;
@@ -652,7 +659,7 @@ router.get(
 //       // Find the food item by ID
 //       const foodItem = await FoodItem.findById(id).lean();
 //       if (!foodItem) {
-//         return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND });
+//         return res.status(404).json({ message: messages.FOOD_ITEM_NOT_FOUND_OR_INACTIVE });
 //       }
 
 //       // Delete the food item image from Cloudinary if it exists

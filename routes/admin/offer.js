@@ -103,7 +103,9 @@ router.post(
           _id: { $in: categories },
         }).lean();
         if (existingCategories.length !== categories.length) {
-          return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
+          return res
+            .status(400)
+            .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
         }
       }
 
@@ -240,7 +242,9 @@ router.put(
           _id: { $in: categories },
         }).lean();
         if (existingCategories.length !== categories.length) {
-          return res.status(400).json({ message: messages.CATEGORY_NOT_FOUND });
+          return res
+            .status(400)
+            .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
         }
         filteredBody.categories = categories;
       }

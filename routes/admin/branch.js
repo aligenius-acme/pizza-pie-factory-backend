@@ -1,5 +1,5 @@
 const express = require("express");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const { branchValidation } = require("../../utils/validation");
 const Branch = require("../../models/Branch");
 const authMiddleware = require("../../middleware/auth");
@@ -116,15 +116,25 @@ router.put(
       // Strip unwanted fields
       const filteredBody = stripUnwantedFields(req.body, Branch.schema);
 
-      const oldName = branch.name;
+      // Check if the new name already exists for another branch (excluding the current branch)
+      if (filteredBody.name && filteredBody.name !== branch.name) {
+        const existingBranch = await Branch.findOne({
+          name: filteredBody.name,
+          _id: { $ne: id }, // Exclude the current branch
+        });
+        if (existingBranch) {
+          return res.status(400).json({ message: messages.BRANCH_EXISTS });
+        }
+      }
 
-      let updateData = { name: filteredBody.name };
+      // Update branch fields
+      Object.assign(branch, filteredBody);
 
       // Upload new image to Cloudinary if provided
       if (req.file) {
         // Delete old image from Cloudinary if it exists
         if (branch.imageUrl) {
-          await cloudinary.uploader.destroy(`branches/${oldName}`);
+          await cloudinary.uploader.destroy(`branches/${branch.name}`);
         }
 
         const uploadStream = () =>
@@ -140,11 +150,10 @@ router.put(
           });
 
         const result = await uploadStream();
-        updateData.imageUrl = result.secure_url;
+        branch.imageUrl = result.secure_url;
       }
 
-      // Update branch fields
-      Object.assign(branch, updateData);
+      // Save the updated branch
       await branch.save();
 
       // Return success response
@@ -171,10 +180,36 @@ router.get(
   "/admin/branches",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [
+    query("branchId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate branchId (optional)
+    query("search").optional().trim(), // Validate search query (optional)
+  ],
   async (req, res) => {
     try {
-      // Fetch all branches
-      const branches = await Branch.find().lean();
+      // Validate request query parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const { branchId, search } = req.query;
+
+      // Build filter object
+      let filter = {};
+
+      // Filter by branchId
+      if (branchId) {
+        filter._id = branchId;
+      }
+
+      // Filter by search query (name or address)
+      if (search) {
+        filter.$or = [
+          { name: { $regex: search, $options: "i" } }, // Case-insensitive search for name
+          { "location.address": { $regex: search, $options: "i" } }, // Case-insensitive search for address
+        ];
+      }
+
+      // Fetch branches with filtering
+      const branches = await Branch.find(filter).lean();
 
       // Check if branches exist
       if (!branches.length) {
@@ -189,34 +224,34 @@ router.get(
   }
 );
 
-// @route   GET /admin/branch/get/:id
-// @desc    Get branch details by ID (Admin Only)
-// @access  PRIVATE (Admin Only)
-router.get(
-  "/admin/branch/get/:id",
-  authMiddleware.authenticateJWT, // Authenticate JWT
-  authMiddleware.authenticateAdmin, // Ensure user is an admin
-  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate branch ID
-  async (req, res) => {
-    try {
-      // Validate request parameters
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// // @route   GET /admin/branch/get/:id
+// // @desc    Get branch details by ID (Admin Only)
+// // @access  PRIVATE (Admin Only)
+// router.get(
+//   "/admin/branch/get/:id",
+//   authMiddleware.authenticateJWT, // Authenticate JWT
+//   authMiddleware.authenticateAdmin, // Ensure user is an admin
+//   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate branch ID
+//   async (req, res) => {
+//     try {
+//       // Validate request parameters
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+//       const { id } = req.params;
 
-      // Find branch by ID
-      const branch = await Branch.findById(id).lean();
-      if (!branch) {
-        return res.status(404).json({ message: messages.BRANCH_NOT_FOUND });
-      }
+//       // Find branch by ID
+//       const branch = await Branch.findById(id).lean();
+//       if (!branch) {
+//         return res.status(404).json({ message: messages.BRANCH_NOT_FOUND });
+//       }
 
-      // Return success response with the branch details
-      res.status(200).json(branch);
-    } catch (error) {
-      handleError(`/admin/branch/get/${req.params.id}`, "GET", error, req, res);
-    }
-  }
-);
+//       // Return success response with the branch details
+//       res.status(200).json(branch);
+//     } catch (error) {
+//       handleError(`/admin/branch/get/${req.params.id}`, "GET", error, req, res);
+//     }
+//   }
+// );
 
 module.exports = router;

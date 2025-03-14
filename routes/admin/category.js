@@ -111,7 +111,9 @@ router.put(
       // Find the category by ID
       const category = await Category.findById(id);
       if (!category) {
-        return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+        return res
+          .status(404)
+          .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
       }
 
       // Strip unwanted fields
@@ -173,10 +175,15 @@ router.get("/admin/category/:id", async (req, res) => {
     const categoryId = req.params.id;
 
     // Fetch the category by ID
-    const category = await Category.findById(categoryId).lean();
+    const category = await Category.findOne({
+      _id: categoryId,
+      isActive: true, // Only fetch active categories
+    }).lean();
 
     if (!category) {
-      return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+      return res
+        .status(404)
+        .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
     }
 
     // Return success response
@@ -192,10 +199,12 @@ router.get("/admin/category/:id", async (req, res) => {
 router.get("/admin/categories", async (req, res) => {
   try {
     // Fetch all categories
-    const categories = await Category.find().lean();
+    const categories = await Category.find({ isActive: true }).lean();
 
     if (categories.length === 0) {
-      return res.status(404).json({ message: messages.NO_CATEGORIES_FOUND });
+      return res
+        .status(404)
+        .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
     }
 
     // Return success response
@@ -232,7 +241,7 @@ router.get("/admin/categories", async (req, res) => {
 //       // Find the category by ID
 //       const category = await Category.findById(id).lean();
 //       if (!category) {
-//         return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND });
+//         return res.status(404).json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
 //       }
 
 //       // Delete the category image from Cloudinary if it exists

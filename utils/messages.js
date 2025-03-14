@@ -85,7 +85,7 @@ module.exports = {
 
   // Category messages
   CATEGORY_EXISTS: "Category with this name already exists",
-  CATEGORY_NOT_FOUND: "Category not found",
+  CATEGORY_NOT_FOUND_OR_INACTIVE: "Category not found or inactive",
   CATEGORY_DELETED_SUCCESS: "Category deleted successfully",
   CATEGORY_HAS_FOOD_ITEMS:
     "Category cannot be deleted as it has associated food items",
@@ -95,13 +95,12 @@ module.exports = {
 
   // Food item messages
   FOOD_ITEM_EXISTS: "Food item with this name already exists",
-  FOOD_ITEM_NOT_FOUND: "Food item not found",
+  FOOD_ITEM_NOT_FOUND_OR_INACTIVE: "Food item not found or is inactive",
   FOOD_ITEM_DELETED_SUCCESS: "Food item deleted successfully",
   FOOD_ITEM_HAS_ORDERS:
     "Food item cannot be deleted as it is referenced in orders",
   NO_FOOD_ITEMS_FOUND: "No food items found",
   INVALID_CATEGORY_ID: "Invalid category ID(s) provided",
-  CATEGORY_NOT_FOUND: "One or more categories do not exist",
   INVALID_CUSTOMIZATION_ID: "Invalid customization ID provided",
   INVALID_CUSTOMIZATION_FORMAT: "Invalid format for customizations",
   INVALID_CATEGORY_FORMAT: "Invalid format for categories",
