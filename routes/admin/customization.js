@@ -115,40 +115,40 @@ router.put(
 // @route   GET /admin/customization/:id
 // @desc    Get a customization by ID (Admin Only)
 // @access  PRIVATE (Admin Only)
-router.get(
-  "/admin/customization/:id",
-  authMiddleware.authenticateJWT, // Authenticate JWT
-  authMiddleware.authenticateAdmin, // Ensure user is an admin
-  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate customization ID
-  async (req, res) => {
-    try {
-      // Validate request parameters
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// router.get(
+//   "/admin/customization/:id",
+//   authMiddleware.authenticateJWT, // Authenticate JWT
+//   authMiddleware.authenticateAdmin, // Ensure user is an admin
+//   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate customization ID
+//   async (req, res) => {
+//     try {
+//       // Validate request parameters
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+//       const { id } = req.params;
 
-      // Find the customization by ID
-      const customization = await Customization.findById(id).lean();
-      if (!customization) {
-        return res
-          .status(404)
-          .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
-      }
+//       // Find the customization by ID
+//       const customization = await Customization.findById(id).lean();
+//       if (!customization) {
+//         return res
+//           .status(404)
+//           .json({ message: messages.CUSTOMIZATION_NOT_FOUND_OR_INACTIVE });
+//       }
 
-      // Return success response
-      res.status(200).json(customization);
-    } catch (error) {
-      handleError(
-        `/admin/customization/${req.params.id}`,
-        "GET",
-        error,
-        req,
-        res
-      );
-    }
-  }
-);
+//       // Return success response
+//       res.status(200).json(customization);
+//     } catch (error) {
+//       handleError(
+//         `/admin/customization/${req.params.id}`,
+//         "GET",
+//         error,
+//         req,
+//         res
+//       );
+//     }
+//   }
+// );
 
 // @route   GET /admin/customizations
 // @desc    Get all customizations (Admin Only)
@@ -158,7 +158,10 @@ router.get(
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
   [
-    query("id").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate ID (optional)
+    query("customizationId")
+      .optional()
+      .isMongoId()
+      .withMessage(messages.INVALID_ID), // Validate ID (optional)
     query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
     query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
     query("sortBy").optional().isString(), // Validate sortBy (optional)
@@ -175,7 +178,7 @@ router.get(
       if (errors) return res.status(400).json({ errors });
 
       const {
-        id,
+        customizationId,
         page = 1,
         limit = 10,
         sortBy = "createdAt",
@@ -194,8 +197,8 @@ router.get(
       let filter = {};
 
       // Filter by ID
-      if (id) {
-        filter._id = id;
+      if (customizationId) {
+        filter._id = customizationId;
       }
 
       // Filter by isActive status

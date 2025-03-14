@@ -2,7 +2,7 @@ const express = require("express");
 const authMiddleware = require("../../middleware/auth");
 const mongoose = require("mongoose");
 const { offerValidation } = require("../../utils/validation");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const multer = require("multer");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
@@ -297,38 +297,38 @@ router.put(
   }
 );
 
-// @route   GET /admin/offer/get/:id
-// @desc    Get offer details by ID
-// @access  PRIVATE
-router.get(
-  "/admin/offer/get/:id",
-  authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage(messages.INVALID_OFFER_ID)],
-  async (req, res) => {
-    try {
-      // Validate request parameters
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+// // @route   GET /admin/offer/get/:id
+// // @desc    Get offer details by ID
+// // @access  PRIVATE
+// router.get(
+//   "/admin/offer/get/:id",
+//   authMiddleware.authenticateJWT,
+//   [param("id").isMongoId().withMessage(messages.INVALID_OFFER_ID)],
+//   async (req, res) => {
+//     try {
+//       // Validate request parameters
+//       const errors = validateRequest(req);
+//       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+//       const { id } = req.params;
 
-      // Find the offer by ID and populate related fields
-      const offer = await Offer.findById(id)
-        .populate({ path: "categories" })
-        .populate({ path: "customizations" })
-        .lean();
+//       // Find the offer by ID and populate related fields
+//       const offer = await Offer.findById(id)
+//         .populate({ path: "categories" })
+//         .populate({ path: "customizations" })
+//         .lean();
 
-      if (!offer) {
-        return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
-      }
+//       if (!offer) {
+//         return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
+//       }
 
-      // Return success response
-      res.status(200).json(offer);
-    } catch (error) {
-      handleError(`/admin/offer/get/${req.params.id}`, "GET", error, req, res);
-    }
-  }
-);
+//       // Return success response
+//       res.status(200).json(offer);
+//     } catch (error) {
+//       handleError(`/admin/offer/get/${req.params.id}`, "GET", error, req, res);
+//     }
+//   }
+// );
 
 // @route   GET /admin/offers
 // @desc    Get all offers
@@ -336,16 +336,104 @@ router.get(
 router.get(
   "/admin/offers",
   authMiddleware.authenticateJWT,
+  [
+    query("offerId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate ID (optional)
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
+    query("sortBy").optional().isString(), // Validate sortBy (optional)
+    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
+    query("isActive").optional().isBoolean(), // Validate isActive (optional)
+    query("startDate").optional().isISO8601(), // Validate startDate (optional)
+    query("endDate").optional().isISO8601(), // Validate endDate (optional)
+    query("search").optional().isString(), // Validate search keyword (optional)
+  ],
   async (req, res) => {
     try {
-      // Fetch all offers and populate related fields
-      const offers = await Offer.find()
-        .populate({ path: "categories" })
-        .populate({ path: "customizations" })
+      // Validate request query parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const {
+        offerId,
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        order = "desc",
+        isActive,
+        startDate,
+        endDate,
+        search,
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      // Build filter object
+      let filter = {};
+
+      // Filter by ID
+      if (offerId) {
+        filter._id = offerId;
+      }
+
+      // Filter by isActive status
+      if (isActive !== undefined) {
+        filter.isActive = isActive;
+      }
+
+      // Filter by date range
+      if (startDate && endDate) {
+        filter.createdAt = {
+          $gte: new Date(startDate), // Greater than or equal to startDate
+          $lte: new Date(endDate), // Less than or equal to endDate
+        };
+      } else if (startDate) {
+        filter.createdAt = {
+          $gte: new Date(startDate), // Greater than or equal to startDate
+        };
+      } else if (endDate) {
+        filter.createdAt = {
+          $lte: new Date(endDate), // Less than or equal to endDate
+        };
+      }
+
+      // Add search functionality
+      if (search) {
+        const searchRegex = new RegExp(search, "i"); // Case-insensitive search
+        filter.$or = [
+          { name: { $regex: searchRegex } }, // Search by name
+          { description: { $regex: searchRegex } }, // Search by description
+        ];
+      }
+
+      // Fetch offers with pagination, sorting, and population
+      const offers = await Offer.find(filter)
+        .populate({ path: "categories" }) // Populate categories
+        .populate({ path: "customizations" }) // Populate customizations
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
         .lean();
 
-      // Return success response
-      res.status(200).json(offers);
+      if (!offers || offers.length === 0) {
+        return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
+      }
+
+      // Get the total count of offers
+      const totalCount = await Offer.countDocuments(filter);
+
+      // Return success response with offers and pagination details
+      res.status(200).json({
+        success: true,
+        data: offers,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
     } catch (error) {
       handleError("/admin/offers", "GET", error, req, res);
     }
