@@ -35,16 +35,20 @@ router.get(
       };
 
       // Step 3: Process each category as a step
+      let stepId = 1; // Unique identifier for each step
       for (const category of offer.categories) {
         const step = {
+          stepId: stepId++, // Increment stepId for each step
           categoryId: category._id,
           categoryName: category.name,
           foodItems: [],
+          completed: false, // Default to false
         };
 
         // Step 4: Retrieve all food items for the current category
         const foodItems = await FoodItem.find({
           categories: category._id,
+          customizations: { $exists: true, $not: { $size: 0 } }, // Ensure customizations exist and are not empty
         }).populate("customizations");
 
         // Step 5: Process each food item and its customizations
@@ -55,27 +59,33 @@ router.get(
             customizations: [],
           };
 
-          // Step 6: Retrieve customizations linked to the offer
+          // Step 6: Filter customizations linked to the offer
           if (foodItem.customizations && foodItem.customizations.length > 0) {
+            const offerCustomizationIds = offer.customizations.map((oc) =>
+              oc.toString()
+            );
+
             for (const customization of foodItem.customizations) {
               // Check if the customization is linked to the offer
               if (
                 customization &&
-                offer.customizations.some(
-                  (offerCustomization) =>
-                    offerCustomization.toString() ===
-                    customization._id.toString()
-                )
+                offerCustomizationIds.includes(customization._id.toString())
               ) {
                 foodItemWithCustomizations.customizations.push(customization);
               }
             }
           }
 
-          step.foodItems.push(foodItemWithCustomizations);
+          // Only include the food item if it has customizations linked to the offer
+          if (foodItemWithCustomizations.customizations.length > 0) {
+            step.foodItems.push(foodItemWithCustomizations);
+          }
         }
 
-        response.steps.push(step);
+        // Only include the step if it has food items with customizations linked to the offer
+        if (step.foodItems.length > 0) {
+          response.steps.push(step);
+        }
       }
 
       // Step 7: Send the response
