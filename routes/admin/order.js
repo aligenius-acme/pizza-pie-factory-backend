@@ -14,11 +14,11 @@ const axios = require("axios");
 
 const router = express.Router();
 
-// @route   GET /admin/order/branch/:branchId
+// @route   GET /admin/orders/branch/:branchId
 // @desc    Get all orders for a specific branch (with pagination and sorting)
 // @access  PRIVATE
 router.get(
-  "/admin/order/branch/:branchId",
+  "/admin/orders/branch/:branchId",
   authMiddleware.authenticateJWT,
   [
     param("branchId").isMongoId().withMessage(messages.INVALID_ID),
@@ -195,7 +195,7 @@ router.get(
 
       res.status(200).json(response);
     } catch (error) {
-      handleError("/admin/order/branch/:branchId", "GET", error, req, res);
+      handleError("/admin/orders/branch/:branchId", "GET", error, req, res);
     }
   }
 );

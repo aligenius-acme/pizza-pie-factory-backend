@@ -53,11 +53,11 @@ router.post(
   }
 );
 
-// @route   PUT /admin/customization/:id
+// @route   PUT /admin/customization/update/:id
 // @desc    Update an existing customization (Admin Only)
 // @access  PRIVATE (Admin Only)
 router.put(
-  "/admin/customization/:id",
+  "/admin/customization/update/:id",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
   [...customizationValidation()], // Apply customization validation rules
@@ -102,7 +102,7 @@ router.put(
       });
     } catch (error) {
       handleError(
-        `/admin/customization/${req.params.id}`,
+        `/admin/customization/update/${req.params.id}`,
         "PUT",
         error,
         req,
@@ -225,10 +225,11 @@ router.get(
       // Add search functionality
       if (search) {
         const searchRegex = new RegExp(search, "i"); // Case-insensitive search
-        filter.$or = [
-          { name: { $regex: searchRegex } }, // Search by name
-          { description: { $regex: searchRegex } }, // Search by description
-        ];
+        filter = {
+          $or: [
+            { customizationName: { $regex: searchRegex } }, // Search by name
+          ],
+        };
       }
 
       // Fetch customizations with pagination and sorting

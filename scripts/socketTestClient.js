@@ -30,3 +30,5 @@ socket.on("connect_error", (err) => {
 socket.on("disconnect", () => {
   console.log("Disconnected from server");
 });
+
+// COMMAND: node scripts/socketTestClient.js

@@ -365,11 +365,11 @@ router.post("/order/payment/callback", async (req, res) => {
 });
 
 // @route   GET /order/track
-// @desc    Track an order using phone number or order ID
+// @desc    Track an order using phone number or order ID and send status via SMS and email
 // @access  PUBLIC
 router.get("/order/track", async (req, res) => {
   try {
-    const { phoneNumber, orderId } = req.query;
+    const { phoneNumber, orderId, email } = req.query;
 
     // Validate request: At least one of phoneNumber or orderId is required
     if (!phoneNumber && !orderId) {
@@ -411,6 +411,24 @@ router.get("/order/track", async (req, res) => {
       instructions: order.instructions,
       orderPlacedAt: order.orderPlacedAt,
     };
+
+    // Send order status via SMS if phone number is valid
+    if (phoneNumber && isValidPhoneNumber(phoneNumber)) {
+      const smsMessage = `Your order status is: ${order.status}. Order ID: ${order._id}`;
+      await sendSms(phoneNumber, smsMessage);
+    }
+
+    // Send order status via email if email is valid
+    if (email && isValidEmail(email)) {
+      const emailSubject = `Order Status Update - Order ID: ${order._id}`;
+      const emailContent = `
+        <h1>Order Status Update</h1>
+        <p>Your order status is: <strong>${order.status}</strong>.</p>
+        <p>Order ID: ${order._id}</p>
+        <p>Thank you for shopping with us!</p>
+      `;
+      await sendEmail(email, emailSubject, emailContent);
+    }
 
     // Return order details
     res.status(200).json({

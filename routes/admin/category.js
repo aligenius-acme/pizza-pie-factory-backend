@@ -1,7 +1,6 @@
 const express = require("express");
-const { param } = require("express-validator");
+const { param, query } = require("express-validator");
 const Category = require("../../models/Category");
-const FoodItem = require("../../models/FoodItem");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
 const streamifier = require("streamifier");
@@ -167,52 +166,130 @@ router.put(
   }
 );
 
-// @route   GET /admin/category/:id
-// @desc    Get a category by ID
-// @access  PUBLIC
-router.get("/admin/category/:id", async (req, res) => {
-  try {
-    const categoryId = req.params.id;
+// // @route   GET /admin/category/:id
+// // @desc    Get a category by ID
+// // @access  PUBLIC
+// router.get("/admin/category/:id", async (req, res) => {
+//   try {
+//     const categoryId = req.params.id;
 
-    // Fetch the category by ID
-    const category = await Category.findOne({
-      _id: categoryId,
-      isActive: true, // Only fetch active categories
-    }).lean();
+//     // Fetch the category by ID
+//     const category = await Category.findOne({
+//       _id: categoryId,
+//       isActive: true, // Only fetch active categories
+//     }).lean();
 
-    if (!category) {
-      return res
-        .status(404)
-        .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
-    }
+//     if (!category) {
+//       return res
+//         .status(404)
+//         .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
+//     }
 
-    // Return success response
-    res.status(200).json(category);
-  } catch (error) {
-    handleError("/admin/category/:id", "GET", error, req, res);
-  }
-});
+//     // Return success response
+//     res.status(200).json(category);
+//   } catch (error) {
+//     handleError("/admin/category/:id", "GET", error, req, res);
+//   }
+// });
 
 // @route   GET /admin/categories
-// @desc    Get all categories
-// @access  PUBLIC
-router.get("/admin/categories", async (req, res) => {
-  try {
-    // Fetch all categories
-    const categories = await Category.find({ isActive: true }).lean();
+// @desc    Get all categories (with pagination, sorting, and filtering)
+// @access  PRIVATE (Admin Only)
+router.get(
+  "/admin/categories",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [
+    query("categoryId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate category ID
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
+    query("sortBy").optional().isString(), // Validate sortBy (optional)
+    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
+    query("isActive").optional().isBoolean(), // Validate isActive (optional)
+    query("search").optional().isString(), // Validate search keyword (optional)
+  ],
+  async (req, res) => {
+    try {
+      // Validate request query parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
 
-    if (categories.length === 0) {
-      return res
-        .status(404)
-        .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
+      const {
+        categoryId,
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        order = "desc",
+        isActive,
+        search,
+      } = req.query;
+
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const sortOrder = order === "asc" ? 1 : -1;
+
+      // Build filter object
+      let filter = {};
+
+      // Filter by categoryId
+      if (categoryId) {
+        filter._id = categoryId;
+      }
+
+      // Filter by isActive status
+      if (isActive !== undefined) {
+        filter.isActive = isActive;
+      }
+
+      // Add search functionality
+      if (search) {
+        const searchRegex = new RegExp(search, "i"); // Case-insensitive search
+        filter.$or = [
+          { name: { $regex: searchRegex } }, // Search by name
+          { description: { $regex: searchRegex } }, // Search by description (if applicable)
+        ];
+      }
+
+      // Find all categories with filtering, sorting, and pagination
+      const categories = await Category.find(filter)
+        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
+        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
+        .lean();
+
+      if (!categories || categories.length === 0) {
+        return res
+          .status(404)
+          .json({ message: messages.CATEGORY_NOT_FOUND_OR_INACTIVE });
+      }
+
+      // If categoryId is provided, return the single category
+      if (categoryId) {
+        return res.status(200).json({
+          success: true,
+          data: categories[0], // Return the first (and only) category
+        });
+      }
+
+      // Get the total count of categories
+      const totalCount = await Category.countDocuments(filter);
+
+      // Return success response with the categories and pagination details
+      res.status(200).json({
+        success: true,
+        data: categories,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          currentPage: pageNumber,
+          pageSize,
+        },
+      });
+    } catch (error) {
+      handleError("/admin/categories", "GET", error, req, res);
     }
-
-    // Return success response
-    res.status(200).json(categories);
-  } catch (error) {
-    handleError("/admin/categories", "GET", error, req, res);
   }
-});
+);
 
 // // @route   DELETE /admin/category/delete/:id
 // // @desc    Delete a category (Admin Only)

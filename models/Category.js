@@ -4,6 +4,7 @@ const { Schema } = mongoose;
 const CategorySchema = new Schema(
   {
     name: { type: String, required: true },
+    description: { type: String },
     imageUrl: { type: String },
     isActive: { type: Boolean, default: true },
   },

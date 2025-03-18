@@ -281,11 +281,11 @@ router.post("/admin/employee/verify-otp", async (req, res) => {
 //   }
 // );
 
-// @route   GET /admin/employee/get
+// @route   GET /admin/employee
 // @desc    Get logged in employee's details
 // @access  PRIVATE
 router.get(
-  "/admin/employee/get",
+  "/admin/employee",
   authMiddleware.authenticateJWT,
   async (req, res) => {
     try {
@@ -303,7 +303,7 @@ router.get(
       // Return success response with employee details
       res.status(200).json(employee);
     } catch (error) {
-      handleError(`/admin/employee/get/${req.user.id}`, "GET", error, req, res);
+      handleError(`/admin/employee/${req.user.id}`, "GET", error, req, res);
     }
   }
 );
@@ -401,11 +401,11 @@ router.post(
   }
 );
 
-// @route   GET /admin/employee/branch/:branchId
+// @route   GET /admin/employees/branch/:branchId
 // @desc    Get all employees for a specific branch (with pagination, sorting, and filtering)
 // @access  PRIVATE (Admin Only)
 router.get(
-  "/admin/employee/branch/:branchId",
+  "/admin/employees/branch/:branchId",
   authMiddleware.authenticateJWT, // Authenticate JWT
   authMiddleware.authenticateAdmin, // Ensure user is an admin
   [
@@ -499,7 +499,7 @@ router.get(
       });
     } catch (error) {
       handleError(
-        `/admin/employee/branch/${req.params.branchId}`,
+        `/admin/employees/branch/${req.params.branchId}`,
         "GET",
         error,
         req,

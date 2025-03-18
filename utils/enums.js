@@ -1,17 +1,17 @@
 const PaymentTypes = Object.freeze({
-  CREDIT_CARD: "Credit Card",
+  CREDIT_CARD: "CREDIT CARD",
   COD: "COD",
 });
 
 const AddressLabels = Object.freeze({
-  HOME: "Home",
-  APARTMENT: "Apartment",
-  OTHER: "Other",
+  HOME: "HOME",
+  APARTMENT: "APARTMENT",
+  OTHER: "OTHER",
 });
 
 const DeliveryTypes = Object.freeze({
-  PICKUP: "Pickup",
-  DELIVERY: "Delivery",
+  PICKUP: "PICK UP",
+  DELIVERY: "DELIVERY",
 });
 
 const OrderStatusses = Object.freeze({
@@ -32,30 +32,30 @@ const Roles = Object.freeze({
 });
 
 const RecipientTypes = Object.freeze({
-  CUSTOMER: "Customer",
+  CUSTOMER: "CUSTOMER",
   // EMPLOYEE: "Employee",
-  BRANCH: "Branch",
+  BRANCH: "BRANCH",
 });
 
 const NotificationTypes = Object.freeze({
-  NEW_ORDER: "New Order",
-  ORDER_UPDATE: "Order Update",
-  PROMOTION: "Promotion",
+  NEW_ORDER: "NEW ORDER",
+  ORDER_UPDATE: "ORDER UPDATE",
+  PROMOTION: "PROMOTION",
 });
 
 const OfferDiscountTypes = Object.freeze({
-  PERCENTAGE: "Percentage",
-  FIXED_AMOUNT: "Fixed Amount",
+  PERCENTAGE: "PERCENTAGE",
+  FIXED_AMOUNT: "FIXED AMOUNT",
 });
 
 const BranchOpeningDays = Object.freeze({
-  MONDAY: "Monday",
-  TUESDAY: "Tuesday",
-  WEDNESDAY: "Wednesday",
-  THURSDAY: "Thursday",
-  FRIDAY: "Friday",
-  SATURDAY: "Saturday",
-  SUNDAY: "Sunday",
+  MONDAY: "MONDAY",
+  TUESDAY: "TUESDAY",
+  WEDNESDAY: "WEDNESDAY",
+  THURSDAY: "THURSDAY",
+  FRIDAY: "FRIDAY",
+  SATURDAY: "SATURDAY",
+  SUNDAY: "SUNDAY",
 });
 
 module.exports = {

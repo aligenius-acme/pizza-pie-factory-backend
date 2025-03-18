@@ -3,7 +3,11 @@ const { query } = require("express-validator");
 const EmployeeMessage = require("../../models/EmployeeMessage");
 const authMiddleware = require("../../middleware/auth");
 const { employeeMessageValidation } = require("../../utils/validation");
-const { validateRequest, logError } = require("../../utils/helpers");
+const {
+  validateRequest,
+  handleError,
+  stripUnwantedFields,
+} = require("../../utils/helpers");
 const messages = require("../../utils/messages");
 
 const router = express.Router();
@@ -31,9 +35,7 @@ router.post(
 
       // Ensure sender and receiver are not the same
       if (senderId === filteredBody.receiverId) {
-        return res
-          .status(400)
-          .json({ message: "Sender and receiver cannot be the same" });
+        return res.status(400).json({ message: messages.SAME_SENDER_RECEIVER });
       }
 
       // Add sender ID to the message
@@ -61,7 +63,7 @@ router.post(
 router.get(
   "/admin/employee/messages",
   authMiddleware.authenticateJWT, // Authenticate JWT
-  [query("employeeId").isMongoId().withMessage("Invalid employee ID")], // Validate query parameter
+  [query("employeeId").isMongoId().withMessage(messages.INVALID_ID)], // Validate query parameter
   async (req, res) => {
     try {
       // Validate request query
@@ -72,7 +74,7 @@ router.get(
       const otherEmployeeId = req.query.employeeId;
 
       // Fetch messages between the current user and the other employee
-      const messages = await EmployeeMessage.find({
+      const employeeMessages = await EmployeeMessage.find({
         $or: [
           { senderId: currentUserId, receiverId: otherEmployeeId },
           { senderId: otherEmployeeId, receiverId: currentUserId },
@@ -82,12 +84,12 @@ router.get(
         .lean();
 
       // Check if messages exist
-      if (!messages.length) {
-        return res.status(404).json({ message: "No messages found" });
+      if (!employeeMessages.length) {
+        return res.status(404).json({ message: messages.NO_MESSAGE_FOUND });
       }
 
       // Return success response with messages
-      res.status(200).json(messages);
+      res.status(200).json(employeeMessages);
     } catch (error) {
       handleError("/admin/employee/messages", "GET", error, req, res);
     }

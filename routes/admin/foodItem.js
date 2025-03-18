@@ -398,11 +398,11 @@ router.put(
   }
 );
 
-// @route   GET /admin/fooditem/branch/top/:branchId
+// @route   GET /admin/fooditems/branch/top/:branchId
 // @desc    Get top 10 best-selling products for a specific branch
 // @access  PRIVATE
 router.get(
-  "/admin/fooditem/branch/top/:branchId",
+  "/admin/fooditems/branch/top/:branchId",
   authMiddleware.authenticateJWT, // Authenticate JWT
   [param("branchId").isMongoId().withMessage(messages.INVALID_ID)], // Validate branch ID
   async (req, res) => {
@@ -416,7 +416,7 @@ router.get(
       // Aggregate to find top 10 best-selling products
       const topProducts = await Order.aggregate([
         // Match orders for the specific branch
-        { $match: { id: mongoose.Types.ObjectId(branchId) } },
+        { $match: { branchId: new mongoose.Types.ObjectId(branchId) } },
         // Unwind the items array to process each item individually
         { $unwind: "$items" },
         // Group by foodItem and calculate total quantity sold
@@ -442,6 +442,9 @@ router.get(
         // Unwind the foodItemDetails array (since lookup returns an array)
         { $unwind: "$foodItemDetails" },
         // Project the required fields, including imageUrl
+
+        // Match only active food items
+        { $match: { "foodItemDetails.isActive": true } },
         {
           $project: {
             _id: 0,
@@ -464,7 +467,7 @@ router.get(
       });
     } catch (error) {
       handleError(
-        `/admin/fooditem/branch/top/${req.params.branchId}`,
+        `/admin/fooditems/branch/top/${req.params.branchId}`,
         "GET",
         error,
         req,
@@ -474,11 +477,11 @@ router.get(
   }
 );
 
-// @route   GET /admin/fooditem
+// @route   GET /admin/fooditems
 // @desc    Get all food items with pagination, filtering, and sorting
 // @access  PRIVATE
 router.get(
-  "/admin/fooditem",
+  "/admin/fooditems",
   authMiddleware.authenticateJWT, // Authenticate JWT
   [
     query("foodItemId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate foodItemId (optional)
@@ -488,6 +491,7 @@ router.get(
     query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
     query("search").optional().isString(), // Validate search keyword (optional)
     query("createdAt").optional().isISO8601().toDate(), // Validate date (optional)
+    query("isActive").optional().isBoolean().toBoolean(), // Validate isActive (optional)
     query("categoryIds") // Validate categoryIds (optional)
       .optional()
       .isString()
@@ -562,6 +566,11 @@ router.get(
         filter.categories = { $in: categoryIdsArray };
       }
 
+      // Filter by isActive
+      if (typeof isActive === "boolean") {
+        filter.isActive = isActive;
+      }
+
       // Add customizationIds filter
       if (customizationIds) {
         // Convert customizationIds to an array of ObjectIds
@@ -611,7 +620,9 @@ router.get(
       const foodItems = await foodItemsQuery.lean();
 
       if (!foodItems || foodItems.length === 0) {
-        return res.status(404).json({ message: messages.NO_FOOD_ITEMS_FOUND });
+        return res
+          .status(404)
+          .json({ message: messages.FOOD_ITEM_NOT_FOUND_OR_INACTIVE });
       }
 
       // Get the total count of food items for the branch
@@ -629,7 +640,7 @@ router.get(
         },
       });
     } catch (error) {
-      handleError("/admin/fooditem", "GET", error, req, res);
+      handleError("/admin/fooditems", "GET", error, req, res);
     }
   }
 );

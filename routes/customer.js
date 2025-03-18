@@ -175,38 +175,33 @@ router.post(
   }
 );
 
-// @route   GET /customer/get/:id
+// @route   GET /customer
 // @desc    Get customer profile by ID
 // @access  PRIVATE
-router.get(
-  "/customer/get/:id",
-  authMiddleware.authenticateJWT,
-  [param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID)],
-  async (req, res) => {
-    try {
-      const errors = validateRequest(req);
-      if (errors) return res.status(400).json({ errors });
+router.get("/customer", authMiddleware.authenticateJWT, async (req, res) => {
+  try {
+    const errors = validateRequest(req);
+    if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
-
-      // Find customer by ID and exclude password field
-      const customer = await Customer.findById(id).select("-password").lean();
-      if (!customer) {
-        return res.status(404).json({ message: messages.CUSTOMER_NOT_FOUND });
-      }
-
-      // If Order model exists, fetch customer's orders
-      if (typeof Order !== "undefined" && mongoose.models.Order) {
-        customer.orders = await Order.find({ customer: id }).lean();
-      }
-
-      // Return customer data
-      res.status(200).json(customer);
-    } catch (error) {
-      handleError(`/customer/get/${req.params.id}`, "GET", error, req, res);
+    // Find customer by ID and exclude password field
+    const customer = await Customer.findById(req.user.id)
+      .select("-password")
+      .lean();
+    if (!customer) {
+      return res.status(404).json({ message: messages.CUSTOMER_NOT_FOUND });
     }
+
+    // If Order model exists, fetch customer's orders
+    if (typeof Order !== "undefined" && mongoose.models.Order) {
+      customer.orders = await Order.find({ customer: req.user.id }).lean();
+    }
+
+    // Return customer data
+    res.status(200).json(customer);
+  } catch (error) {
+    handleError(`/customer/${req.user.id}`, "GET", error, req, res);
   }
-);
+});
 
 // @route   POST /customer/forgot-password
 // @desc    Initiate password reset process

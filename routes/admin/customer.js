@@ -9,15 +9,16 @@ const {
   validateEmployeeBranchAssociation,
 } = require("../../utils/helpers");
 const messages = require("../../utils/messages");
+const { default: mongoose } = require("mongoose");
 require("dotenv").config();
 
 const router = express.Router();
 
-// @route   GET /admin/customer/branch/:branchId
+// @route   GET /admin/customers/branch/:branchId
 // @desc    Get all customers who have placed orders in a specific branch (with pagination, sorting, and filtering)
 // @access  PRIVATE (Admin Only)
 router.get(
-  "/admin/customer/branch/:branchId",
+  "/admin/customers/branch/:branchId",
   authMiddleware.authenticateJWT, // Authenticate JWT
   [
     param("branchId").isMongoId().withMessage(messages.INVALID_ID), // Validate branch ID
@@ -66,7 +67,10 @@ router.get(
       const orders = await Order.find({ branchId: branchId }).select(
         "customerId"
       );
-      const customerIds = [...new Set(orders.map((order) => order.customerId))];
+      // Use a Set to ensure unique customer IDs
+      const customerIds = [
+        ...new Set(orders.map((order) => order.customerId.toString())),
+      ].map((id) => new mongoose.Types.ObjectId(id));
 
       // Build filter object for customers
       let filter = { _id: { $in: customerIds } };
@@ -98,6 +102,8 @@ router.get(
         filter.createdAt = { $gte: startOfDay, $lte: endOfDay }; // Filter by createdAt date
       }
 
+      console.log(filter);
+
       // Find all customers who have placed orders in the branch
       const customers = await Customer.find(filter)
         .select(
@@ -109,7 +115,7 @@ router.get(
         .lean();
 
       if (!customers || customers.length === 0) {
-        return res.status(404).json({ message: messages.NO_CUSTOMERS_FOUND });
+        return res.status(404).json({ message: messages.CUSTOMER_NOT_FOUND });
       }
 
       // Get the total count of customers for the branch
@@ -128,7 +134,7 @@ router.get(
       });
     } catch (error) {
       handleError(
-        `/admin/customer/branch/${req.params.branchId}`,
+        `/admin/customers/branch/${req.params.branchId}`,
         "GET",
         error,
         req,

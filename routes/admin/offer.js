@@ -323,7 +323,7 @@ router.put(
 //         .lean();
 
 //       if (!offer) {
-//         return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
+//         return res.status(404).json({ message: messages.OFFER_NOT_FOUND_OR_INACTIVE });
 //       }
 
 //       // Return success response
@@ -421,7 +421,9 @@ router.get(
         .lean();
 
       if (!offers || offers.length === 0) {
-        return res.status(404).json({ message: messages.OFFER_NOT_FOUND });
+        return res
+          .status(404)
+          .json({ message: messages.OFFER_NOT_FOUND_OR_INACTIVE });
       }
 
       // Get the total count of offers

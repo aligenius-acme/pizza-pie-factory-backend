@@ -99,7 +99,6 @@ module.exports = {
   FOOD_ITEM_DELETED_SUCCESS: "Food item deleted successfully",
   FOOD_ITEM_HAS_ORDERS:
     "Food item cannot be deleted as it is referenced in orders",
-  NO_FOOD_ITEMS_FOUND: "No food items found",
   INVALID_CATEGORY_ID: "Invalid category ID(s) provided",
   INVALID_CUSTOMIZATION_ID: "Invalid customization ID provided",
   INVALID_CUSTOMIZATION_FORMAT: "Invalid format for customizations",
@@ -150,7 +149,12 @@ module.exports = {
   CUSTOMIZATION_UPDATE_SUCCESS: "Customization updated successfully",
 
   // Offer messages
-  OFFER_NOT_FOUND: "Offer not found",
+  OFFER_NOT_FOUND_OR_INACTIVE: "One or more offers do not exist or inactive",
   OFFER_EXISTS: "Offer with this name already exists",
   INVALID_OFFER_ID: "Invalid Offer ID provided",
+
+  // Notification messages
+  SAME_SENDER_RECEIVER: "Sender and receiver cannot be the same",
+  NO_MESSAGE_FOUND: "No message(s) found",
+  NOTIFICATIONS_NOT_FOUND: "No notification(s) found",
 };
