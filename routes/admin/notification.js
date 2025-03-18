@@ -84,23 +84,26 @@ router.post(
             `<p>${message}</p>`
           );
           await sendSms(customerPhone, message);
-        } else {
-          // Emit Socket.IO event for real-time notifications
-          io.to(recipientId.toString()).emit("newNotification", notification);
         }
-      } else if (recipientType === RecipientTypes.EMPLOYEE) {
+        // else {
+        //   // Emit Socket.IO event for real-time notifications
+        //   io.to(recipientId.toString()).emit("newNotification", notification);
+        // }
+      } else if (recipientType === RecipientTypes.BRANCH) {
         // Emit Socket.IO event for employees
         if (branchId) {
           io.to(branchId.toString()).emit("newNotification", notification);
-        } else {
-          io.emit("newNotification", notification);
         }
-      } else {
-        // Emit Socket.IO event for other recipient types
-        if (recipientId) {
-          io.to(recipientId.toString()).emit("newNotification", notification);
-        }
+        // else {
+        //   io.emit("newNotification", notification);
+        // }
       }
+      // else {
+      //   // Emit Socket.IO event for other recipient types
+      //   if (recipientId) {
+      //     io.to(recipientId.toString()).emit("newNotification", notification);
+      //   }
+      // }
 
       // Return success response
       res.status(201).json(notification);

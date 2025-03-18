@@ -22,10 +22,10 @@ const io = socketIo(server, {
 io.on("connection", (socket) => {
   console.log("New client connected, socket id:", socket.id);
 
-  // Handle employee joining their own room
-  socket.on("join", (employeeId) => {
-    socket.join(employeeId);
-    console.log(`Employee ${employeeId} joined room ${employeeId}`);
+  // Handle employee joining their branch room
+  socket.on("joinBranch", (branchId) => {
+    socket.join(branchId);
+    console.log(`Employee joined branch room: ${branchId}`);
   });
 
   // Handle real-time messaging
@@ -34,10 +34,10 @@ io.on("connection", (socket) => {
     io.to(receiverId).emit("receiveMessage", { senderId, message });
   });
 
-  // Handle real-time notifications
-  socket.on("sendNotification", ({ recipientId, notification }) => {
-    console.log(`Notification for ${recipientId}: ${notification}`);
-    io.to(recipientId).emit("receiveNotification", { notification });
+  // Handle real-time notifications for a branch
+  socket.on("sendNotification", ({ branchId, notification }) => {
+    console.log(`Notification for branch ${branchId}: ${notification}`);
+    io.to(branchId).emit("receiveNotification", { notification });
   });
 
   socket.on("disconnect", () => {
