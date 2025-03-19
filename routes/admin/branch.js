@@ -183,6 +183,8 @@ router.get(
   [
     query("branchId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate branchId (optional)
     query("search").optional().trim(), // Validate search query (optional)
+    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
+    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
   ],
   async (req, res) => {
     try {
@@ -190,7 +192,7 @@ router.get(
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
-      const { branchId, search } = req.query;
+      const { branchId, search, page = 1, limit = 10 } = req.query;
 
       // Build filter object
       let filter = {};
@@ -208,16 +210,36 @@ router.get(
         ];
       }
 
-      // Fetch branches with filtering
-      const branches = await Branch.find(filter).lean();
+      // Calculate pagination values
+      const pageNumber = parseInt(page, 10);
+      const pageSize = parseInt(limit, 10);
+      const skip = (pageNumber - 1) * pageSize;
+
+      // Fetch branches with filtering and pagination
+      const branches = await Branch.find(filter)
+        .skip(skip) // Skip records for pagination
+        .limit(pageSize) // Limit the number of records per page
+        .lean();
+
+      // Get the total count of branches (for pagination metadata)
+      const totalCount = await Branch.countDocuments(filter);
 
       // Check if branches exist
       if (!branches.length) {
         return res.status(404).json({ message: messages.NO_BRANCHES_FOUND });
       }
 
-      // Return success response with the list of branches
-      res.status(200).json(branches);
+      // Return success response with the list of branches and pagination metadata
+      return res.status(200).json({
+        success: true,
+        data: branches,
+        pagination: {
+          totalItems: totalCount, // Total number of branches
+          totalPages: Math.ceil(totalCount / pageSize), // Total number of pages
+          currentPage: pageNumber, // Current page number
+          pageSize, // Number of items per page
+        },
+      });
     } catch (error) {
       handleError("/admin/branches", "GET", error, req, res);
     }
