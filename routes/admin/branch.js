@@ -264,7 +264,26 @@ router.get(
       const { id } = req.params;
 
       // Find analytics data by branch ID
-      const analytics = await Analytics.findOne({ branchId: id }).lean();
+      const analytics = await Analytics.findOne({ branchId: id })
+        .populate({
+          path: "branchId",
+          model: "Branch",
+        })
+        .populate({
+          path: "topFoodItems.foodItem",
+          model: "FoodItem",
+          populate: [
+            {
+              path: "categories",
+              model: "Category",
+            },
+            {
+              path: "customizations",
+              model: "Customization",
+            },
+          ],
+        })
+        .lean();
       if (!analytics) {
         return res.status(404).json({ message: messages.ANALYTICS_NOT_FOUND });
       }
