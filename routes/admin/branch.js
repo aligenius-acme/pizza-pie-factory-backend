@@ -2,6 +2,7 @@ const express = require("express");
 const { param, query } = require("express-validator");
 const { branchValidation } = require("../../utils/validation");
 const Branch = require("../../models/Branch");
+const Analytics = require("../../models/Analytics");
 const authMiddleware = require("../../middleware/auth");
 const multer = require("multer");
 const streamifier = require("streamifier");
@@ -242,6 +243,45 @@ router.get(
       });
     } catch (error) {
       handleError("/admin/branches", "GET", error, req, res);
+    }
+  }
+);
+
+// @route   GET /admin/branch/analytics/:id
+// @desc    Get branch analytics by ID (Admin Only)
+// @access  PRIVATE (Admin Only)
+router.get(
+  "/admin/branch/analytics/:id",
+  authMiddleware.authenticateJWT, // Authenticate JWT
+  authMiddleware.authenticateAdmin, // Ensure user is an admin
+  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate branch ID
+  async (req, res) => {
+    try {
+      // Validate request parameters
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const { id } = req.params;
+
+      // Find analytics data by branch ID
+      const analytics = await Analytics.findOne({ branchId: id }).lean();
+      if (!analytics) {
+        return res.status(404).json({ message: messages.ANALYTICS_NOT_FOUND });
+      }
+
+      // Return success response with the branch analytics
+      return res.status(200).json({
+        success: true,
+        data: analytics,
+      });
+    } catch (error) {
+      handleError(
+        `/admin/branch/analytics/${req.params.id}`,
+        "GET",
+        error,
+        req,
+        res
+      );
     }
   }
 );

@@ -157,4 +157,7 @@ module.exports = {
   SAME_SENDER_RECEIVER: "Sender and receiver cannot be the same",
   NO_MESSAGE_FOUND: "No message(s) found",
   NOTIFICATIONS_NOT_FOUND: "No notification(s) found",
+
+  // Analytics messages
+  ANALYTICS_NOT_FOUND: "Analytics not found",
 };
