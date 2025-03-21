@@ -28,6 +28,12 @@ io.on("connection", (socket) => {
     console.log(`Employee joined branch room: ${branchId}`);
   });
 
+  // Handle employee joining their branch room
+  socket.on("join", (receiverId) => {
+    socket.join(receiverId);
+    console.log(`Employee joined room: ${receiverId}`);
+  });
+
   // Handle real-time messaging
   socket.on("sendMessage", ({ senderId, receiverId, message }) => {
     console.log(`Message from ${senderId} to ${receiverId}: ${message}`);
