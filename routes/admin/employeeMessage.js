@@ -166,7 +166,10 @@ router.get(
       }
 
       // Return success response with messages
-      res.status(200).json(employeeMessages);
+      return res.status(200).json({
+        success: true,
+        data: employeeMessages,
+      });
     } catch (error) {
       handleError(
         `/admin/employee/messages/branch/${req.params.branchId}`,
@@ -232,7 +235,10 @@ router.get(
         .lean();
 
       // Return success response with employees
-      res.status(200).json(employees);
+      return res.status(200).json({
+        success: true,
+        data: employees,
+      });
     } catch (error) {
       handleError(
         `/admin/employee/messages/employees/branch/${req.params.branchId}`,
