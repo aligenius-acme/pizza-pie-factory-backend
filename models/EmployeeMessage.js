@@ -13,6 +13,11 @@ const EmployeeMessageSchema = new Schema(
       ref: "Employee",
       required: true,
     },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: "Branch",
+      required: true,
+    },
     message: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
   },

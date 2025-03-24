@@ -92,7 +92,8 @@ router.post(
       } else if (recipientType === RecipientTypes.BRANCH) {
         // Emit Socket.IO event for employees
         if (branchId) {
-          io.to(branchId.toString()).emit("newNotification", notification);
+          //io.to(branchId.toString()).emit("newNotification", notification);
+          io.emit("newNotification", notification);
         }
         // else {
         //   io.emit("newNotification", notification);

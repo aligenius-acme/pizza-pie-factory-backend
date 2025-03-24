@@ -195,7 +195,13 @@ router.get(
 
       res.status(200).json(response);
     } catch (error) {
-      handleError("/admin/orders/branch/:branchId", "GET", error, req, res);
+      handleError(
+        `/admin/orders/branch/${req.params.branchId}`,
+        "GET",
+        error,
+        req,
+        res
+      );
     }
   }
 );
