@@ -93,6 +93,9 @@ router.post(
         validatePickupTime(branch, pickupDay, pickupTime);
       }
 
+      // Find the customer
+      const customer = await Customer.findById(filteredBody.customerId);
+
       // Create the order
       const newOrder = new Order({
         customerId: filteredBody.customerId,
@@ -133,9 +136,6 @@ router.post(
 
       // If payment method is Credit Card, redirect to ADCB payment page
       if (filteredBody.paymentMethod === PaymentTypes.CREDIT_CARD) {
-        // Find the customer
-        const customer = await Customer.findById(filteredBody.customerId);
-
         // Check if the customer has a saved card
         const savedCard = customer.paymentMethods.find(
           (method) =>
@@ -178,7 +178,6 @@ router.post(
       await Cart.deleteMany({ customerId: filteredBody.customerId });
 
       // Add reward points to the customer
-      const customer = await Customer.findById(filteredBody.customerId);
       const pointsEarned = Math.floor(cart.totalAmount * REWARD_POINTS_PER_AED);
       customer.rewardPoints += pointsEarned;
 

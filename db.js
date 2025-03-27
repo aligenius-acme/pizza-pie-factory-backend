@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
-const mongoURI = "mongodb://localhost:27017/pizzapiefactory";
+// DEV
+// const mongoURI = "mongodb://localhost:27017/pizzapiefactory";
+
+// PROD
+const mongoURI =
+  "mongodb+srv://aligenius:iplewSpTXpUZYc4A@pizzapiefactoryclustor.k3qvwca.mongodb.net/pizzapiefactory?retryWrites=true&w=majority&appName=PizzaPieFactoryClustor";
 
 const connectToMongo = async () => {
   try {
