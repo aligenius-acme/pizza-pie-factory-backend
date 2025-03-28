@@ -148,6 +148,19 @@ router.get(
           order.deliveryDriver = order.deliveryDriverId;
           delete order.deliveryDriverId;
         }
+        // Rename foodItemId to foodItem in items array
+        if (order.items && Array.isArray(order.items)) {
+          order.items = order.items.map((item) => {
+            if (item.foodItemId) {
+              return {
+                ...item,
+                foodItem: item.foodItemId,
+                foodItemId: undefined, // Remove the old field
+              };
+            }
+            return item;
+          });
+        }
         return order;
       };
 
