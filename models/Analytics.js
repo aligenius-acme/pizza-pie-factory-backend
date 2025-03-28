@@ -144,12 +144,13 @@ const AnalyticsSchema = new Schema(
     totalRevenueToday: { type: Number, required: true, min: 0, default: 0 },
     topFoodItems: [
       {
-        foodItem: {
+        foodItemId: {
           type: Schema.Types.ObjectId,
           ref: "FoodItem",
           required: true,
         },
         count: { type: Number, default: 0 },
+        foodItemDetails: { type: Schema.Types.Mixed }, // Add this line
       },
     ],
     lastUpdated: { type: Date, default: Date.now },

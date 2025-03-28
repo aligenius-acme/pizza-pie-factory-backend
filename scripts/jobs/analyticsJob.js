@@ -471,7 +471,7 @@ async function updateAnalytics() {
       },
       {
         $group: {
-          _id: { branchId: "$branchId", foodItem: "$items.foodItem" },
+          _id: { branchId: "$branchId", foodItem: "$items.foodItemId" },
           orderCount: { $sum: "$items.quantity" },
         },
       },
@@ -496,6 +496,32 @@ async function updateAnalytics() {
         },
       },
     ]);
+
+    // Create a map to store populated top food items by branch
+    const populatedTopFoodItemsMap = new Map();
+
+    // Populate food items for each branch
+    await Promise.all(
+      topFoodItemsByBranch.map(async (branch) => {
+        const populatedItems = await Promise.all(
+          branch.topFoodItems.map(async (item) => {
+            const foodItem = await mongoose
+              .model("FoodItem")
+              .findById(item.foodItem)
+              .lean();
+            return {
+              ...item,
+              foodItemDetails: foodItem, // Add the full food item details
+            };
+          })
+        );
+
+        populatedTopFoodItemsMap.set(
+          branch.branchId.toString(),
+          populatedItems
+        );
+      })
+    );
 
     // Merge data and update analytics
     const branchDataMap = new Map();
@@ -541,6 +567,10 @@ async function updateAnalytics() {
         previousYearDataMap.get(branchData.branchId.toString()) || {};
       const topFoodItems =
         topFoodItemsMap.get(branchData.branchId.toString()) || [];
+
+      // Get the populated food items for this branch
+      const populatedTopFoodItems =
+        populatedTopFoodItemsMap.get(branchData.branchId.toString()) || [];
 
       // Calculate percentage changes
       const percentageChangeOrdersPreviousDay = calculatePercentageChange(
@@ -678,7 +708,7 @@ async function updateAnalytics() {
           percentageChangeRevenuePreviousYear,
           percentageChangePreparationTimePreviousYear,
           percentageChangeDeliveryTimePreviousYear,
-          topFoodItems: topFoodItems, // Now includes count
+          topFoodItems: populatedTopFoodItems, // Use the populated items
           lastUpdated: new Date(),
         },
         { upsert: true, new: true }

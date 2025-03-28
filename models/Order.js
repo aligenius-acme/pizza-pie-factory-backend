@@ -30,7 +30,7 @@ const OrderSchema = new Schema(
     },
     items: [
       {
-        foodItem: {
+        foodItemId: {
           type: Schema.Types.ObjectId,
           ref: "FoodItem",
           default: null,

@@ -76,14 +76,14 @@ router.post(
       }
 
       // Check if delivery is within the branch's radius
-      if (
-        filteredBody.deliveryType === DeliveryTypes.DELIVERY &&
-        !isWithinDeliveryRadius(branch, filteredBody.deliveryAddress)
-      ) {
-        return res
-          .status(400)
-          .json({ message: messages.DELIVERY_NOT_AVAILABLE });
-      }
+      // if (
+      //   filteredBody.deliveryType === DeliveryTypes.DELIVERY &&
+      //   !isWithinDeliveryRadius(branch, filteredBody.deliveryAddress)
+      // ) {
+      //   return res
+      //     .status(400)
+      //     .json({ message: messages.DELIVERY_NOT_AVAILABLE });
+      // }
 
       // Validate pickup time for PICKUP orders
       if (filteredBody.deliveryType === DeliveryTypes.PICKUP) {
@@ -102,8 +102,8 @@ router.post(
         branchId: filteredBody.branchId,
         items: cart.items,
         offers: cart.offers,
-        tax: cart.tax,
-        deliveryCharges: cart.deliveryCharges,
+        tax: 0,
+        deliveryCharges: 0,
         totalAmount: cart.totalAmount,
         status: OrderStatusses.PENDING_PAYMENT, // Default status for credit card payments
         paymentMethod: filteredBody.paymentMethod,
@@ -112,14 +112,14 @@ router.post(
           filteredBody.deliveryType === DeliveryTypes.DELIVERY
             ? filteredBody.deliveryAddress
             : null,
-        pickupDay:
-          filteredBody.deliveryType === DeliveryTypes.PICKUP
-            ? filteredBody.pickupDay
-            : null,
-        pickupTime:
-          filteredBody.deliveryType === DeliveryTypes.PICKUP
-            ? filteredBody.pickupTime
-            : null,
+        // pickupDay:
+        //   filteredBody.deliveryType === DeliveryTypes.PICKUP
+        //     ? filteredBody.pickupDay
+        //     : null,
+        // pickupTime:
+        //   filteredBody.deliveryType === DeliveryTypes.PICKUP
+        //     ? filteredBody.pickupTime
+        //     : null,
         phoneNumber: customer.phoneNumber,
         instructions: filteredBody.instructions,
         statusHistory: [

@@ -120,7 +120,7 @@ router.get(
 
       // Populate foodItemId for each item in the items array
       query = query.populate({
-        path: "items.foodItem", // Nested path for foodItem
+        path: "items.foodItemId", // Nested path for foodItem
         select: "name description imageUrl", // Include the required fields
       });
 
