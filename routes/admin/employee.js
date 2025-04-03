@@ -401,6 +401,43 @@ router.post(
   }
 );
 
+// @route   PATCH /admin/employee/:id/branch
+// @desc    Update employee's branchId
+// @access  Private (Admin only)
+router.patch(
+  "/admin/employee/:id/branch",
+  authMiddleware.authenticateJWT,
+  authMiddleware.authenticateAdmin,
+  [param("id").isMongoId().withMessage(messages.INVALID_EMPLOYEE_ID)],
+  async (req, res) => {
+    try {
+      const errors = validateRequest(req);
+      if (errors) return res.status(400).json({ errors });
+
+      const { id } = req.params;
+      const { branchId } = req.body;
+
+      // Find and update the employee
+      const updatedEmployee = await Employee.findByIdAndUpdate(
+        id,
+        { branchId },
+        { new: true, runValidators: true }
+      ).select("-password -otp -otpExpiry"); // Exclude sensitive fields
+
+      if (!updatedEmployee) {
+        return res.status(404).json({ message: messages.EMPLOYEE_NOT_FOUND });
+      }
+
+      res.status(200).json({
+        message: messages.EMPLOYEE_UPDATED,
+        employee: updatedEmployee,
+      });
+    } catch (error) {
+      handleError("/admin/employee/:id/branch", "PATCH", error, req, res);
+    }
+  }
+);
+
 // @route   GET /admin/employees/branch/:branchId
 // @desc    Get all employees for a specific branch (with pagination, sorting, and filtering)
 // @access  PRIVATE (Admin Only)
