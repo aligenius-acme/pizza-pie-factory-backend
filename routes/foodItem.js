@@ -13,13 +13,13 @@ const router = express.Router();
 router.get(
   "/fooditems",
   [
-    query("page").optional().isInt({ min: 1 }).toInt(), // Validate page (optional)
-    query("limit").optional().isInt({ min: 1 }).toInt(), // Validate limit (optional)
-    query("sortBy").optional().isString(), // Validate sortBy (optional)
-    query("order").optional().isIn(["asc", "desc"]), // Validate order (optional)
-    query("categoryid").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate category ID (optional)
-    query("search").optional().isString(), // Validate search keyword (optional)
-    query("foodItemId").optional().isMongoId().withMessage(messages.INVALID_ID), // Validate foodItemId (optional)
+    query("page").optional().isInt({ min: 1 }).toInt(),
+    query("limit").optional().isInt({ min: 1 }).toInt(),
+    query("sortBy").optional().isString(),
+    query("order").optional().isIn(["asc", "desc"]),
+    query("categoryid").optional().isMongoId().withMessage(messages.INVALID_ID),
+    query("search").optional().isString(),
+    query("foodItemId").optional().isMongoId().withMessage(messages.INVALID_ID),
   ],
   async (req, res) => {
     try {
@@ -55,23 +55,35 @@ router.get(
       }
 
       // Get active products only
-      filter.isActive = isActive;
+      filter.isActive = true;
 
       // Add search functionality
       if (search) {
-        const searchRegex = new RegExp(search, "i"); // Case-insensitive search
+        const searchRegex = new RegExp(search, "i");
         filter.$or = [
-          { name: { $regex: searchRegex } }, // Search by name
-          { description: { $regex: searchRegex } }, // Search by description
+          { name: { $regex: searchRegex } },
+          { description: { $regex: searchRegex } },
         ];
       }
 
-      // Fetch food items with pagination, filtering, and sorting
-      const foodItems = await FoodItem.find(filter)
-        .sort({ [sortBy]: sortOrder }) // Sort by the specified field
-        .skip((pageNumber - 1) * pageSize) // Skip records for pagination
-        .limit(pageSize) // Limit the number of records per page
-        .lean();
+      // Create base query
+      let query = FoodItem.find(filter)
+        .sort({ [sortBy]: sortOrder })
+        .skip((pageNumber - 1) * pageSize)
+        .limit(pageSize);
+
+      // If foodItemId is provided, populate customizations
+      if (foodItemId) {
+        query = query.populate({
+          path: "customizations",
+          // You can add more options here if needed, like selecting specific fields
+          // select: 'name price',
+          // match: { isActive: true } // if you want to filter active customizations
+        });
+      }
+
+      // Execute the query
+      const foodItems = await query.lean();
 
       if (!foodItems.length) {
         return res
