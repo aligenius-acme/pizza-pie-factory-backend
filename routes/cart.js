@@ -194,9 +194,6 @@ router.put(
   ],
   async (req, res) => {
     try {
-      // Validate request body
-      if (validateRequest(req, res)) return;
-
       const { items, offers } = req.body;
       const customerId = req.user.id; // Get customer ID from authenticated user
 
