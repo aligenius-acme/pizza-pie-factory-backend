@@ -20,9 +20,6 @@ router.post(
   [...cartValidation()], // Apply cart validation rules
   async (req, res) => {
     try {
-      // Validate request body
-      if (validateRequest(req, res)) return;
-
       const { items, offers } = req.body;
       const customerId = req.user.id; // Get customer ID from authenticated user
 
@@ -367,23 +364,19 @@ router.put(
   }
 );
 
-// @route   GET /cart/get/:id
-// @desc    Get cart details by ID (Customer Only)
+// @route   GET /cart/get
+// @desc    Get cart details for the customer (Customer Only)
 // @access  PRIVATE (Customer Only)
 router.get(
-  "/cart/get/:id",
+  "/cart/get",
   authMiddleware.authenticateJWT, // Authenticate the user
   [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate the cart ID
   async (req, res) => {
     try {
-      // Validate the request
-      if (validateRequest(req, res)) return;
-
-      const { id } = req.params; // Extract the cart ID from the request parameters
       const customerId = req.user.id; // Extract the customer ID from the authenticated user
 
       // Find the cart by ID and ensure it belongs to the authenticated customer
-      const cart = await Cart.findOne({ _id: id, customerId });
+      const cart = await Cart.findOne({ customerId });
 
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
