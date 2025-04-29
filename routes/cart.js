@@ -183,14 +183,13 @@ router.post(
   }
 );
 
-// @route   PUT /cart/update/:cartId
+// @route   PUT /cart/update
 // @desc    Update an existing cart for the authenticated customer
 // @access  PRIVATE (Customer Only)
 router.put(
-  "/cart/update/:cartId",
+  "/cart/update",
   authMiddleware.authenticateJWT, // Authenticate JWT
   [
-    param("cartId").isMongoId().withMessage(messages.INVALID_CART_ID), // Validate cart ID
     ...cartValidation(), // Apply cart validation rules
   ],
   async (req, res) => {
@@ -198,14 +197,22 @@ router.put(
       // Validate request body
       if (validateRequest(req, res)) return;
 
-      const { cartId } = req.params;
       const { items, offers } = req.body;
       const customerId = req.user.id; // Get customer ID from authenticated user
 
       // Find the cart
-      let cart = await Cart.findOne({ _id: cartId, customerId });
+      let cart = await Cart.findOne({ customerId });
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
+      }
+
+      // If no items are provided, delete the cart
+      if (!items || items.length === 0) {
+        await Cart.deleteOne({ customerId });
+        return res.status(200).json({
+          message: messages.CART_DELETED_SUCCESS,
+          cart: null,
+        });
       }
 
       let totalAmount = 0;
@@ -359,7 +366,7 @@ router.put(
         cart,
       });
     } catch (error) {
-      handleError("/cart/update/:cartId", "PUT", error, req, res);
+      handleError("/cart/update", "PUT", error, req, res);
     }
   }
 );
@@ -370,7 +377,6 @@ router.put(
 router.get(
   "/cart/get",
   authMiddleware.authenticateJWT, // Authenticate the user
-  [param("id").isMongoId().withMessage(messages.INVALID_ID)], // Validate the cart ID
   async (req, res) => {
     try {
       const customerId = req.user.id; // Extract the customer ID from the authenticated user
