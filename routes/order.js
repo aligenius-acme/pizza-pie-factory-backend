@@ -503,4 +503,26 @@ router.get(
   }
 );
 
+// @route   GET /order/branches
+// @desc    Get all branches (Admin Only)
+// @access  PRIVATE (Admin Only)
+router.get("/order/branches", async (req, res) => {
+  try {
+    // Validate request query parameters
+    const errors = validateRequest(req);
+    if (errors) return res.status(400).json({ errors });
+
+    // Fetch branches with filtering and pagination
+    const branches = await Branch.find().lean();
+
+    // Return success response with the list of branches and pagination metadata
+    return res.status(200).json({
+      success: true,
+      data: branches,
+    });
+  } catch (error) {
+    handleError("/order/branches", "GET", error, req, res);
+  }
+});
+
 module.exports = router;
