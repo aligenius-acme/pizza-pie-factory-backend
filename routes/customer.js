@@ -78,27 +78,24 @@ router.post(
   }
 );
 
-// @route   PUT /customer/update/:id
+// @route   PUT /customer/update
 // @desc    Update customer profile
 // @access  PRIVATE
 router.put(
-  "/customer/update/:id",
+  "/customer/update",
   authMiddleware.authenticateJWT,
-  [
-    param("id").isMongoId().withMessage(messages.INVALID_CUSTOMER_ID),
-    customerValidation.all(),
-  ],
+  [customerValidation.all()],
   async (req, res) => {
     try {
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.params;
+      const { id } = req.user.id;
 
-      // Ensure the authenticated user is updating their own profile
-      if (req.user.id !== id) {
-        return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
-      }
+      // // Ensure the authenticated user is updating their own profile
+      // if (req.user.id !== id) {
+      //   return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
+      // }
 
       // Strip unwanted fields
       const filteredBody = stripUnwantedFields(req.body, Customer.schema);
@@ -134,7 +131,7 @@ router.put(
         customer,
       });
     } catch (error) {
-      handleError(`/customer/update/${req.params.id}`, "PUT", error, req, res);
+      handleError(`/customer/update/${req.user.id}`, "PUT", error, req, res);
     }
   }
 );
