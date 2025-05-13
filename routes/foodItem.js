@@ -17,7 +17,7 @@ router.get(
     query("limit").optional().isInt({ min: 1 }).toInt(),
     query("sortBy").optional().isString(),
     query("order").optional().isIn(["asc", "desc"]),
-    query("categoryid").optional().isMongoId().withMessage(messages.INVALID_ID),
+    query("categoryId").optional().isMongoId().withMessage(messages.INVALID_ID),
     query("search").optional().isString(),
     query("foodItemId").optional().isMongoId().withMessage(messages.INVALID_ID),
   ],
@@ -30,7 +30,7 @@ router.get(
       const {
         page = 1,
         limit = 10,
-        categoryid,
+        categoryId,
         sortBy = "createdAt",
         order = "desc",
         search,
@@ -49,9 +49,11 @@ router.get(
         filter._id = foodItemId;
       }
 
+      console.log(categoryId);
+
       // Filter by category ID
-      if (categoryid) {
-        filter.categories = categoryid;
+      if (categoryId) {
+        filter.categories = categoryId;
       }
 
       // Get active products only
