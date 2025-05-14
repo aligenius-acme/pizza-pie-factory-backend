@@ -84,13 +84,18 @@ router.post(
 router.put(
   "/customer/update",
   authMiddleware.authenticateJWT,
-  [customerValidation.all()],
+  [
+    customerValidation.name,
+    customerValidation.phone,
+    customerValidation.deliveryAddresses,
+    customerValidation.paymentMethods,
+  ],
   async (req, res) => {
     try {
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
-      const { id } = req.user.id;
+      const id = req.user.id;
 
       // // Ensure the authenticated user is updating their own profile
       // if (req.user.id !== id) {
@@ -101,14 +106,14 @@ router.put(
       const filteredBody = stripUnwantedFields(req.body, Customer.schema);
 
       // Check for duplicate email or phone (excluding the current user)
-      const existingCustomer = await Customer.findOne({
-        $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
-        _id: { $ne: id },
-      }).lean();
+      // const existingCustomer = await Customer.findOne({
+      //   $or: [{ email: filteredBody.email }, { phone: filteredBody.phone }],
+      //   _id: { $ne: id },
+      // }).lean();
 
-      if (existingCustomer) {
-        return res.status(400).json({ message: messages.CUSTOMER_EXISTS });
-      }
+      // if (existingCustomer) {
+      //   return res.status(400).json({ message: messages.CUSTOMER_EXISTS });
+      // }
 
       // Find the customer by ID
       const customer = await Customer.findById(id).select("-password");
@@ -116,10 +121,10 @@ router.put(
         return res.status(404).json({ message: messages.CUSTOMER_NOT_FOUND });
       }
 
-      // Hash new password if provided
-      if (filteredBody.password) {
-        filteredBody.password = await hashPassword(filteredBody.password);
-      }
+      // // Hash new password if provided
+      // if (filteredBody.password) {
+      //   filteredBody.password = await hashPassword(filteredBody.password);
+      // }
 
       // Update customer fields
       Object.assign(customer, filteredBody);
