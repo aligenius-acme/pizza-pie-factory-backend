@@ -672,11 +672,11 @@ const cartValidation = () => [
 
 // Order validation logic
 const orderValidation = () => [
-  body("customerId")
-    .notEmpty()
-    .withMessage(orderMessages.customerId.required)
-    .isMongoId()
-    .withMessage(orderMessages.customerId.invalid),
+  // body("customerId")
+  //   .notEmpty()
+  //   .withMessage(orderMessages.customerId.required)
+  //   .isMongoId()
+  //   .withMessage(orderMessages.customerId.invalid),
 
   body("branchId")
     .notEmpty()
@@ -745,12 +745,12 @@ const orderValidation = () => [
     .isIn(Object.values(BranchOpeningDays))
     .withMessage(orderMessages.pickupDay.invalid),
 
-  body("pickupTime")
-    .if((value, { req }) => req.body.deliveryType === DeliveryTypes.PICKUP)
-    .notEmpty()
-    .withMessage(orderMessages.pickupTime.required)
-    .custom((value) => isValidTime(value))
-    .withMessage(orderMessages.pickupTime.invalid),
+  // body("pickupTime")
+  //   .if((value, { req }) => req.body.deliveryType === DeliveryTypes.PICKUP)
+  //   .notEmpty()
+  //   .withMessage(orderMessages.pickupTime.required)
+  //   .custom((value) => isValidTime(value))
+  //   .withMessage(orderMessages.pickupTime.invalid),
 
   // body("items.*.itemPrice")
   //   .notEmpty()

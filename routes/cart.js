@@ -65,7 +65,6 @@ router.post(
                   opt._id.toString() === cust.selectedOption._id.toString()
               );
 
-            console.log(selectedOption);
             if (selectedOption) {
               additionalPrice += selectedOption.additionalPrice * item.quantity;
 
@@ -375,28 +374,49 @@ router.put(
 // @route   GET /cart/get
 // @desc    Get cart details for the customer (Customer Only)
 // @access  PRIVATE (Customer Only)
-router.get(
-  "/cart/get",
-  authMiddleware.authenticateJWT, // Authenticate the user
-  async (req, res) => {
-    try {
-      const customerId = req.user.id; // Extract the customer ID from the authenticated user
+router.get("/cart/get", authMiddleware.authenticateJWT, async (req, res) => {
+  try {
+    const customerId = req.user.id;
 
-      // Find the cart by ID and ensure it belongs to the authenticated customer
-      const cart = await Cart.findOne({ customerId }).populate(
-        "items.foodItemId"
-      );
+    const cart = await Cart.findOne({ customerId })
+      .populate({
+        path: "items.foodItemId",
+        select: "name imageUrl", // Only fetch required fields
+      })
+      .populate("items.customizations.customizationId")
+      .populate("items.offer.offerId")
+      .populate("offers.offerId");
 
-      if (!cart) {
-        return res.status(404).json({ message: messages.CART_NOT_FOUND });
-      }
-
-      // Return the cart details
-      res.status(200).json(cart);
-    } catch (error) {
-      handleError("/cart/get", "GET", error, req, res);
+    if (!cart) {
+      return res.status(404).json({ message: messages.CART_NOT_FOUND });
     }
+
+    // Flatten foodItem name & imageUrl into each item
+    const formattedCart = {
+      _id: cart._id,
+      customerId: cart.customerId,
+      items: cart.items.map((item) => ({
+        _id: item._id,
+        foodItemId: item.foodItemId?._id ?? null,
+        quantity: item.quantity,
+        customizations: item.customizations,
+        name: item.foodItemId?.name ?? item.name ?? null,
+        imageUrl: item.foodItemId?.imageUrl ?? item.imageUrl ?? null,
+        itemPrice: item.itemPrice,
+        totalPrice: item.totalPrice,
+        offer: item.offer,
+      })),
+      offers: cart.offers,
+      totalAmount: cart.totalAmount,
+      createdAt: cart.createdAt,
+      updatedAt: cart.updatedAt,
+      __v: cart.__v,
+    };
+
+    res.status(200).json(formattedCart);
+  } catch (error) {
+    handleError("/cart/get", "GET", error, req, res);
   }
-);
+});
 
 module.exports = router;

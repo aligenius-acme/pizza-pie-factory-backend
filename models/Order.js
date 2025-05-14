@@ -125,7 +125,11 @@ const OrderSchema = new Schema(
       },
       validate: {
         validator: function (time) {
-          const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
+          // If deliveryType is not PICKUP, skip validation (no pickupTime expected)
+          if (this.deliveryType !== DeliveryTypes.PICKUP) return true;
+
+          // If deliveryType is PICKUP, time must match HH:MM format
+          const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
           return timeRegex.test(time);
         },
         message: (props) =>

@@ -50,6 +50,8 @@ router.post(
       const errors = validateRequest(req);
       if (errors) return res.status(400).json({ errors });
 
+      const customerId = req.user.id; // Get customer ID from authenticated user
+
       // Strip unwanted fields
       const filteredBody = stripUnwantedFields(req.body, Order.schema);
 
@@ -59,7 +61,7 @@ router.post(
       // }
 
       // Find the customer's cart
-      const cart = await Cart.findOne({ customerId: filteredBody.customerId });
+      const cart = await Cart.findOne({ customerId: customerId });
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
       }
@@ -76,14 +78,14 @@ router.post(
       }
 
       // Check if delivery is within the branch's radius
-      if (
-        filteredBody.deliveryType === DeliveryTypes.DELIVERY &&
-        !isWithinDeliveryRadius(branch, filteredBody.deliveryAddress)
-      ) {
-        return res
-          .status(400)
-          .json({ message: messages.DELIVERY_NOT_AVAILABLE });
-      }
+      // if (
+      //   filteredBody.deliveryType === DeliveryTypes.DELIVERY &&
+      //   !isWithinDeliveryRadius(branch, filteredBody.deliveryAddress)
+      // ) {
+      //   return res
+      //     .status(400)
+      //     .json({ message: messages.DELIVERY_NOT_AVAILABLE });
+      // }
 
       // Validate pickup time for PICKUP orders
       if (filteredBody.deliveryType === DeliveryTypes.PICKUP) {
@@ -94,16 +96,16 @@ router.post(
       }
 
       // Find the customer
-      const customer = await Customer.findById(filteredBody.customerId);
+      const customer = await Customer.findById(customerId);
 
       // Create the order
       const newOrder = new Order({
-        customerId: filteredBody.customerId,
+        customerId: customerId,
         branchId: filteredBody.branchId,
         items: cart.items,
         offers: cart.offers,
-        tax: cart.tax,
-        deliveryCharges: cart.deliveryCharges,
+        tax: filteredBody.tax,
+        deliveryCharges: filteredBody.deliveryCharges,
         totalAmount: cart.totalAmount,
         status: OrderStatusses.PENDING_PAYMENT, // Default status for credit card payments
         paymentMethod: filteredBody.paymentMethod,
@@ -175,7 +177,7 @@ router.post(
       await newOrder.save();
 
       // Delete the cart after successful order creation
-      await Cart.deleteMany({ customerId: filteredBody.customerId });
+      await Cart.deleteMany({ customerId: customerId });
 
       // Add reward points to the customer
       const pointsEarned = Math.floor(cart.totalAmount * REWARD_POINTS_PER_AED);
@@ -190,44 +192,44 @@ router.post(
 
       const token = req.headers.authorization?.split(" ")[1]; // Extract the token
 
-      // Send notification to the customer
-      await axios.post(
-        `${BACKEND_URL}/api/admin/notification/create`,
-        {
-          recipientId: filteredBody.customerId,
-          recipientType: RecipientTypes.CUSTOMER,
-          message: messages.NOTIFICATION_CUSTOMER_ORDER_CREATED.message(
-            newOrder._id
-          ),
-          type: NotificationTypes.NEW_ORDER,
-          relatedOrderId: newOrder._id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // // Send notification to the customer
+      // await axios.post(
+      //   `${BACKEND_URL}/api/admin/notification/create`,
+      //   {
+      //     recipientId: filteredBody.customerId,
+      //     recipientType: RecipientTypes.CUSTOMER,
+      //     message: messages.NOTIFICATION_CUSTOMER_ORDER_CREATED.message(
+      //       newOrder._id
+      //     ),
+      //     type: NotificationTypes.NEW_ORDER,
+      //     relatedOrderId: newOrder._id,
+      //   },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${token}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //   }
+      // );
 
-      // Send notification to the branch
-      await axios.post(
-        `${BACKEND_URL}/api/admin/notification/create`,
-        {
-          recipientId: filteredBody.branchId,
-          recipientType: RecipientTypes.BRANCH,
-          message: messages.NOTIFICATION_BRANCH_NEW_ORDER.message(newOrder._id),
-          type: NotificationTypes.ORDER_UPDATE,
-          relatedOrderId: newOrder._id,
-          branchId: filteredBody.branchId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // // Send notification to the branch
+      // await axios.post(
+      //   `${BACKEND_URL}/api/admin/notification/create`,
+      //   {
+      //     recipientId: filteredBody.branchId,
+      //     recipientType: RecipientTypes.BRANCH,
+      //     message: messages.NOTIFICATION_BRANCH_NEW_ORDER.message(newOrder._id),
+      //     type: NotificationTypes.ORDER_UPDATE,
+      //     relatedOrderId: newOrder._id,
+      //     branchId: filteredBody.branchId,
+      //   },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${token}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //   }
+      // );
 
       // Return success response
       res.status(201).json({
