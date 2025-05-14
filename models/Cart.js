@@ -34,6 +34,8 @@ const CartSchema = new Schema(
             ],
           },
         ],
+        name: { type: String },
+        imageUrl: { type: String },
         itemPrice: { type: Number, required: true },
         totalPrice: { type: Number, required: true },
         offer: {

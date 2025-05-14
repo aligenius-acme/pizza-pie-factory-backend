@@ -685,6 +685,7 @@ const orderValidation = () => [
     .withMessage(orderMessages.branchId.invalid),
 
   body("deliveryDriverId")
+    .optional()
     .isMongoId()
     .withMessage(orderMessages.deliveryDriverId.invalid),
 

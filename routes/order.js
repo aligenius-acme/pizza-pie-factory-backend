@@ -53,10 +53,10 @@ router.post(
       // Strip unwanted fields
       const filteredBody = stripUnwantedFields(req.body, Order.schema);
 
-      // Ensure the customer is updating their own order
-      if (filteredBody.customerId !== req.user.id) {
-        return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
-      }
+      // // Ensure the customer is updating their own order
+      // if (filteredBody.customerId !== req.user.id) {
+      //   return res.status(403).json({ message: messages.UNAUTHORIZED_ACCESS });
+      // }
 
       // Find the customer's cart
       const cart = await Cart.findOne({ customerId: filteredBody.customerId });

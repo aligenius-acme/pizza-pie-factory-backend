@@ -92,6 +92,8 @@ router.post(
         updatedItems.push({
           ...item,
           itemPrice: foodItem.price, // Use the price from the database
+          name: foodItem.name,
+          imageUrl: foodItem.imageUrl,
           additionalPrice,
           totalPrice: itemTotal,
         });
@@ -280,6 +282,8 @@ router.put(
         updatedItems.push({
           ...item,
           itemPrice: foodItem.price, // Use the price from the database
+          name: foodItem.name,
+          imageUrl: foodItem.imageUrl,
           additionalPrice,
           totalPrice: itemTotal,
         });
@@ -379,7 +383,9 @@ router.get(
       const customerId = req.user.id; // Extract the customer ID from the authenticated user
 
       // Find the cart by ID and ensure it belongs to the authenticated customer
-      const cart = await Cart.findOne({ customerId });
+      const cart = await Cart.findOne({ customerId }).populate(
+        "items.foodItemId"
+      );
 
       if (!cart) {
         return res.status(404).json({ message: messages.CART_NOT_FOUND });
