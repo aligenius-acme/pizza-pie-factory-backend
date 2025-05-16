@@ -357,6 +357,7 @@ router.put(
       cart.items = updatedItems;
       cart.offers = appliedOffers;
       cart.totalAmount = totalAmount;
+      cart.customerId = customerId;
 
       await cart.save();
 
